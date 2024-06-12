@@ -20,7 +20,8 @@ type jsonCommandStruct struct {
 	Args          []string `json:"args"`
 }
 
-// jsonCommandStruct represents a command to be executed.
+// jsonKillStruct represents a job to be killed.
+// note that  if job == -1, then all jobs will be killed
 type jsonKillStruct struct {
 	JobNo JobNoType `json:"job"`
 }
