@@ -11,7 +11,7 @@ Note that the client is for testing purposes.
 
 ## Running the server:
 
-You need to set the `SERVER_AUTH_TOKEN` environment variable.  Share this securely with your client(s).
+You need to set the `SERVER_AUTH_TOKEN` environment variable.  Share this securely with your client(s).  The client will need to pass along this same token via the `X-Session-Token` HTTP header.  If it doesn't or the tokens don't match, then the client will receive a "403 Forbidden" error.
 
 You also need to pass in the certificate and the certificate key.  
 
@@ -85,6 +85,6 @@ type jsonKillStruct struct {
 curl --header "Content-Type: application/json" \
   -H "X-Session-Token: micah1" \
   --request POST \
-  --data '{"username":"xyz","password":"xyz"}' \
-  https://localhost:8888/exit
+  --data '{"timeout":0,"cmd":"sleep","args":["5"]}' \
+  https://localhost:8888/runInBackground
 ```
