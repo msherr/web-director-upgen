@@ -162,9 +162,6 @@ func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler 
 // Main Function
 
 func main() {
-	go jobManager()
-	go produceNextJobNumber()
-
 	var (
 		certPath string
 		keyPath  string
@@ -184,6 +181,9 @@ func main() {
 	log.Println("Certificate Path:", certPath)
 	log.Println("Key Path:", keyPath)
 
+	go jobManager()
+	go produceNextJobNumber()
+
 	r := mux.NewRouter()
 
 	r.HandleFunc("/version", handleVersion)
@@ -195,9 +195,8 @@ func main() {
 
 	amw := authenticationMiddleware{}
 	amw.Init()
-
 	r.Use(amw.Middleware)
-	log.Println("Server started on port " + port + "...")
 
+	log.Println("Server starting on port " + port)
 	log.Fatal(http.ListenAndServeTLS(":"+port, certPath, keyPath, r))
 }
