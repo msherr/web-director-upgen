@@ -1,5 +1,11 @@
 # web-director
 
+## Compiling
+
+```bash
+go build ./cmd/server
+
+```
 
 ## Testing
 
