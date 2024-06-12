@@ -1,0 +1,5 @@
+module github.com/msherr/web-director
+
+go 1.21.6
+
+require github.com/gorilla/mux v1.8.1

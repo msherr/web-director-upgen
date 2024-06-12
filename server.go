@@ -17,6 +17,8 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -165,6 +167,23 @@ func main() {
 	go jobManager()
 	go produceNextJobNumber()
 
+	var (
+		certPath string
+		keyPath  string
+	)
+
+	flag.StringVar(&certPath, "certpath", "", "Path to the certificate file")
+	flag.StringVar(&keyPath, "keypath", "", "Path to the key file")
+	flag.Parse()
+
+	if certPath == "" || keyPath == "" {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	fmt.Println("Certificate Path:", certPath)
+	fmt.Println("Key Path:", keyPath)
+
 	r := mux.NewRouter()
 
 	r.HandleFunc("/version", handleVersion)
@@ -179,5 +198,5 @@ func main() {
 
 	r.Use(amw.Middleware)
 
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServeTLS(":8888", certPath, keyPath, r))
 }
