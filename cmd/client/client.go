@@ -129,7 +129,7 @@ func main() {
 
 	makeRequest(ctxGFW, "/jobs", nil)
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 250; i++ {
 		digCmd := datamodel.JsonCommandStruct{
 			TimeoutInSecs: 0,
 			Cmd:           "dig",
@@ -141,7 +141,7 @@ func main() {
 		makeRequest(ctxCensoredVM, "/runToCompletion", digCmd)
 	}
 
-	time.Sleep(15 * time.Second)
+	time.Sleep(2 * time.Second)
 	log.Println("Killing all jobs")
 	makeRequest(ctxCensoredVM, "/kill", allJobs)
 	makeRequest(ctxGFW, "/kill", allJobs)
