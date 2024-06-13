@@ -22,6 +22,12 @@ const AuthTokenKey = AuthTokenKeyType("authToken")
 const ClientKey = ClientKeyType("client")
 const URLEndpointKey = URLEndpointType("urlEndpoint")
 
+var allJobs = struct {
+	JobID int `json:"job"`
+}{
+	JobID: -1,
+}
+
 // jsonCommandStruct represents a command to be executed.
 type jsonCommandStruct struct {
 	TimeoutInSecs float32  `json:"timeout"` // anything positive will be considered a timeout
@@ -63,7 +69,10 @@ func makeRequest(ctx context.Context, f string, data any) {
 		if err != nil {
 			log.Fatal(err)
 		}
+		fmt.Printf("Response from %s%s:\n\n", url, f)
 		fmt.Println(string(b))
+	} else {
+		log.Fatalf("Unexpected status code from %s%s: %d", url, f, res.StatusCode)
 	}
 }
 
@@ -111,26 +120,31 @@ func main() {
 	ctxGFW = context.WithValue(ctxGFW, URLEndpointKey, gfwUrlEndpoint)
 	ctxCensoredVM = context.WithValue(ctxGFW, URLEndpointKey, censoredUrlEndpoint)
 
-	sleepCmd := jsonCommandStruct{
+	startOpenGFWCommand := jsonCommandStruct{
 		TimeoutInSecs: 0,
-		Cmd:           "sleep",
-		Args:          []string{"2"},
+		Cmd:           "../OpenGFW/OpenGFW",
+		Args:          []string{"-c", "../OpenGFW/configs/config.yaml", "../OpenGFW/rules/ruleset.yaml"},
 	}
-	for i := 0; i < 10; i++ {
-		fmt.Println("Requesting sleep ")
-		makeRequest(ctxCensoredVM, "/runInBackground", sleepCmd)
+	log.Println("Starting OpenGFW")
+	makeRequest(ctxGFW, "/runInBackground", startOpenGFWCommand)
+	time.Sleep(2 * time.Second)
+
+	makeRequest(ctxGFW, "/jobs", nil)
+
+	for i := 0; i < 500; i++ {
+		digCmd := jsonCommandStruct{
+			TimeoutInSecs: 0,
+			Cmd:           "dig",
+			Args: []string{
+				fmt.Sprintf("thisisatest.%d.log.message", i),
+				"@10.128.0.1",
+			},
+		}
+		makeRequest(ctxCensoredVM, "/runToCompletion", digCmd)
 	}
 
-	makeRequest(ctxCensoredVM, "/jobs", nil)
-
-	makeRequest(ctxCensoredVM, "/kill",
-		struct {
-			JobID int `json:"job"`
-		}{
-			JobID: -1,
-		})
-
-	makeRequest(ctxCensoredVM, "/jobs", nil)
-	makeRequest(ctxGFW, "/version", nil)
-
+	time.Sleep(3 * time.Second)
+	log.Println("Killing all jobs")
+	makeRequest(ctxCensoredVM, "/kill", allJobs)
+	makeRequest(ctxGFW, "/kill", allJobs)
 }

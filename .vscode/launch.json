@@ -25,11 +25,11 @@
             "mode": "auto",
             "program": "${fileDirname}",
             "env" : {
-                "SERVER_AUTH_TOKEN": "micah1"
+                "SERVER_AUTH_TOKEN": "krjci4k5xlfkmafdkrt,gfgklfa"
             },
             "args": [
-                "-insecure",
-                "-url", "https://localhost:8888"
+                "-gfw_url", "https://opengfw.cs-georgetown.net",
+                "-censoredvm_url", "https://sad-censored-vm.cs-georgetown.net"
             ]
         }
     ]
