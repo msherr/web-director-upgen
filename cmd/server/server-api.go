@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -12,21 +14,6 @@ import (
 
 	"datamodel"
 )
-
-// Structs
-
-// jsonCommandStruct represents a command to be executed.
-type jsonCommandStruct struct {
-	TimeoutInSecs float32  `json:"timeout"` // anything positive will be considered a timeout
-	Cmd           string   `json:"cmd"`
-	Args          []string `json:"args"`
-}
-
-// jsonKillStruct represents a job to be killed.
-// note that  if job == -1, then all jobs will be killed
-type jsonKillStruct struct {
-	JobNo datamodel.JobNoType `json:"job"`
-}
 
 // HTTP Handlers
 
@@ -51,7 +38,7 @@ func handleExit(w http.ResponseWriter, r *http.Request) {
 
 // handleRunToCompletion handles the "/runToCompletion" endpoint and executes a command synchronously.
 func handleRunToCompletion(w http.ResponseWriter, r *http.Request) {
-	var cmdFromForm jsonCommandStruct
+	var cmdFromForm datamodel.JsonCommandStruct
 	if err := json.NewDecoder(r.Body).Decode(&cmdFromForm); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -91,7 +78,7 @@ func handleRunToCompletion(w http.ResponseWriter, r *http.Request) {
 
 // handleRunInBackground handles the "/runInBackground" endpoint and executes a command asynchronously.
 func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
-	var cmdFromForm jsonCommandStruct
+	var cmdFromForm datamodel.JsonCommandStruct
 	if err := json.NewDecoder(r.Body).Decode(&cmdFromForm); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -99,6 +86,7 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 
 	var cmd *exec.Cmd
 	var err error
+	var stdout, stderr io.ReadCloser
 
 	if cmdFromForm.TimeoutInSecs > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cmdFromForm.TimeoutInSecs)*time.Second)
@@ -109,12 +97,54 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 		cmd = exec.Command(cmdFromForm.Cmd, cmdFromForm.Args...)
 	}
 
+	// create pipes for stderr and stdout
+	if cmdFromForm.StdoutFile != "" {
+		stdout, err = cmd.StdoutPipe()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	if cmdFromForm.StderrFile != "" {
+		stderr, err = cmd.StderrPipe()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// run the thing, in the background
 	if err = cmd.Start(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	// call wait on the thing we just started
 	go func() {
+
+		// first, save stdout and stderr to files, if necessary
+		pipePointers := []struct {
+			fileName string
+			src      io.ReadCloser
+		}{
+			{cmdFromForm.StdoutFile, stdout},
+			{cmdFromForm.StderrFile, stderr},
+		}
+		for _, pipePointer := range pipePointers {
+			if pipePointer.fileName != "" {
+				file, err := os.Create(pipePointer.fileName)
+				if err != nil {
+					log.Printf("warning: cannot create file (%v): %v\n", pipePointer.fileName, err)
+					return
+				}
+				defer file.Close()
+				_, err = io.Copy(file, pipePointer.src)
+				if err != nil {
+					log.Printf("warning: cannot write to file (%v): %v\n", pipePointer.fileName, err)
+					return
+				}
+			}
+		}
 		cmd.Wait()
 	}()
 	processChannel <- &datamodel.ProcessJobStruct{
@@ -135,7 +165,7 @@ func handleJobList(w http.ResponseWriter, r *http.Request) {
 
 // handleJobList handles the "/jobs" endpoint and returns the list of running jobs.
 func handleKillJob(w http.ResponseWriter, r *http.Request) {
-	var jsonKill jsonKillStruct
+	var jsonKill datamodel.JsonKillStruct
 	if err := json.NewDecoder(r.Body).Decode(&jsonKill); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
