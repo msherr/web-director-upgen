@@ -119,6 +119,7 @@ func main() {
 		Cmd:           "../OpenGFW/OpenGFW",
 		Args:          []string{"-c", "../OpenGFW/configs/config.yaml", "../OpenGFW/rules/ruleset.yaml"},
 		StdoutFile:    "OpenGFW.log",
+		StderrFile:    "OpenGFW.err",
 	}
 	log.Println("Starting OpenGFW")
 	makeRequest(ctxGFW, "/runInBackground", startOpenGFWCommand)
@@ -126,7 +127,7 @@ func main() {
 
 	makeRequest(ctxGFW, "/jobs", nil)
 
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 3; i++ {
 		digCmd := datamodel.JsonCommandStruct{
 			TimeoutInSecs: 0,
 			Cmd:           "dig",

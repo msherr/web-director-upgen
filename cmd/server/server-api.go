@@ -132,15 +132,13 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, pipePointer := range pipePointers {
 			if pipePointer.fileName != "" {
-				file, err := os.Create(pipePointer.fileName)
+				data, err := io.ReadAll(*pipePointer.src)
 				if err != nil {
-					log.Printf("warning: cannot create file (%v): %v\n", pipePointer.fileName, err)
+					log.Printf("warning: cannot read from pipe (%v): %v\n", pipePointer.fileName, err)
 					return
 				}
-				defer file.Close()
-				_, err = io.Copy(file, *(pipePointer.src))
-				if err != nil {
-					log.Printf("warning: cannot write to file (%v): %v\n", pipePointer.fileName, err)
+				if err := os.WriteFile(pipePointer.fileName, data, 0644); err != nil {
+					log.Printf("warning: cannot create file (%v): %v\n", pipePointer.fileName, err)
 					return
 				}
 			}
