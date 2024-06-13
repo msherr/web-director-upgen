@@ -79,6 +79,7 @@ func handleRunToCompletion(w http.ResponseWriter, r *http.Request) {
 
 func writeToFile(wg *sync.WaitGroup, fileName string, s *io.ReadCloser) {
 	defer wg.Done()
+	wg.Add(1)
 	file, err := os.Create(fileName)
 	if err != nil {
 		log.Printf("warning: cannot create file (%v): %v\n", fileName, err)
@@ -148,11 +149,14 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
 		for _, pipePointer := range pipePointers {
 			if pipePointer.fileName != "" {
+				// writeToFile adds 1 to wg
 				go writeToFile(&wg, pipePointer.fileName, pipePointer.src)
-				wg.Add(1)
 			}
 		}
+		// wait for stderr and stdout to finish writing
 		wg.Wait()
+
+		// finally, wait for the process to finish (which is should have already)
 		cmd.Wait()
 	}()
 

@@ -116,8 +116,9 @@ func jobManager() {
 				if p.JobNo == jobNo || jobNo == -1 {
 					// kill the process
 					log.Printf("Killing process %v: %v", p.JobNo, p.Cmd)
+					// Note: p.Cmd.Wait() is called in goroutine spun off of
+					// handleRunInBackground
 					p.Cmd.Process.Kill()
-					//p.Cmd.Wait()
 					delete(processJobs, p)
 				}
 			}
