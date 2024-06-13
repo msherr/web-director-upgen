@@ -125,10 +125,10 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 		// first, save stdout and stderr to files, if necessary
 		pipePointers := []struct {
 			fileName string
-			src      io.ReadCloser
+			src      *io.ReadCloser
 		}{
-			{cmdFromForm.StdoutFile, stdout},
-			{cmdFromForm.StderrFile, stderr},
+			{cmdFromForm.StdoutFile, &stdout},
+			{cmdFromForm.StderrFile, &stderr},
 		}
 		for _, pipePointer := range pipePointers {
 			if pipePointer.fileName != "" {
@@ -138,7 +138,7 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				defer file.Close()
-				_, err = io.Copy(file, pipePointer.src)
+				_, err = io.Copy(file, *pipePointer.src)
 				if err != nil {
 					log.Printf("warning: cannot write to file (%v): %v\n", pipePointer.fileName, err)
 					return
