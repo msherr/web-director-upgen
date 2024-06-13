@@ -138,7 +138,7 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				defer file.Close()
-				_, err = io.Copy(file, *pipePointer.src)
+				_, err = io.Copy(file, *(pipePointer.src))
 				if err != nil {
 					log.Printf("warning: cannot write to file (%v): %v\n", pipePointer.fileName, err)
 					return
@@ -147,10 +147,13 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 		}
 		cmd.Wait()
 	}()
+
 	processChannel <- &datamodel.ProcessJobStruct{
-		Cmd:     cmd,
-		JobNo:   <-jobChannel,
-		CmdLine: cmdFromForm.Cmd + " " + strings.Join(cmdFromForm.Args, " "),
+		Cmd:        cmd,
+		JobNo:      <-jobChannel,
+		CmdLine:    cmdFromForm.Cmd + " " + strings.Join(cmdFromForm.Args, " "),
+		StdoutFile: cmdFromForm.StdoutFile,
+		StderrFile: cmdFromForm.StderrFile,
 	}
 	writeJson(true, w)
 }

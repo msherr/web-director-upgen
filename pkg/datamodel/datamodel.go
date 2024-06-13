@@ -6,9 +6,11 @@ type JobNoType int
 
 // ProcessJobStruct represents a background process job.
 type ProcessJobStruct struct {
-	Cmd     *exec.Cmd
-	JobNo   JobNoType
-	CmdLine string
+	Cmd        *exec.Cmd
+	JobNo      JobNoType
+	CmdLine    string
+	StdoutFile string
+	StderrFile string
 }
 
 // JsonCommandStruct represents a command to be executed.

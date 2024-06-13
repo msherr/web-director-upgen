@@ -32,8 +32,10 @@ const version = "0.0.1"
 
 // jobList represents a list of jobs.
 type jobList []struct {
-	JobNo   datamodel.JobNoType `json:"jobNo"`
-	CmdLine string              `json:"cmdLine"`
+	JobNo      datamodel.JobNoType `json:"jobNo"`
+	CmdLine    string              `json:"cmdLine"`
+	StdoutFile string              `json:"stdoutFile"`
+	StderrFile string              `json:"stderrFile"`
 }
 
 // Variables
@@ -96,11 +98,15 @@ func jobManager() {
 			jobList := make(jobList, 0, len(processJobs))
 			for p := range processJobs {
 				jobList = append(jobList, struct {
-					JobNo   datamodel.JobNoType `json:"jobNo"`
-					CmdLine string              `json:"cmdLine"`
+					JobNo      datamodel.JobNoType `json:"jobNo"`
+					CmdLine    string              `json:"cmdLine"`
+					StdoutFile string              `json:"stdoutFile"`
+					StderrFile string              `json:"stderrFile"`
 				}{
-					JobNo:   p.JobNo,
-					CmdLine: p.CmdLine,
+					JobNo:      p.JobNo,
+					CmdLine:    p.CmdLine,
+					StdoutFile: p.StdoutFile,
+					StderrFile: p.StderrFile,
 				})
 			}
 			jobListResponseChannel <- jobList

@@ -126,7 +126,7 @@ func main() {
 
 	makeRequest(ctxGFW, "/jobs", nil)
 
-	for i := 0; i < 500; i++ {
+	for i := 0; i < 50; i++ {
 		digCmd := datamodel.JsonCommandStruct{
 			TimeoutInSecs: 0,
 			Cmd:           "dig",
