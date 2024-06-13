@@ -16,12 +16,12 @@ intended for managing experiments.
 package main
 
 import (
+	"datamodel"
 	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -30,36 +30,27 @@ import (
 // Constants
 const version = "0.0.1"
 
-// processJobStruct represents a background process job.
-type processJobStruct struct {
-	cmd     *exec.Cmd
-	jobNo   JobNoType
-	cmdLine string
-}
-
-type JobNoType int
-
 // jobList represents a list of jobs.
 type jobList []struct {
-	JobNo   JobNoType `json:"jobNo"`
-	CmdLine string    `json:"cmdLine"`
+	JobNo   datamodel.JobNoType `json:"jobNo"`
+	CmdLine string              `json:"cmdLine"`
 }
 
 // Variables
 
-var processChannel = make(chan *processJobStruct)
-var jobChannel = make(chan JobNoType)
+var processChannel = make(chan *datamodel.ProcessJobStruct)
+var jobChannel = make(chan datamodel.JobNoType)
 
 // Channels for job list management
 var jobListRequestChannel = make(chan any)
 var jobListResponseChannel = make(chan jobList)
-var jobKillChannel = make(chan JobNoType)
+var jobKillChannel = make(chan datamodel.JobNoType)
 
 // Helper Functions
 
 // produceNextJobNumber generates the next job number and sends it to the jobChannel.
 func produceNextJobNumber() {
-	jobNo := JobNoType(0)
+	jobNo := datamodel.JobNoType(0)
 	for {
 		jobChannel <- jobNo
 		jobNo++
@@ -85,7 +76,7 @@ func writeJson(v any, w http.ResponseWriter) error {
 // job.
 func jobManager() {
 	ticker := time.NewTicker(500 * time.Millisecond)
-	processJobs := make(map[*processJobStruct]any)
+	processJobs := make(map[*datamodel.ProcessJobStruct]any)
 	for {
 		select {
 		case cmd := <-processChannel:
@@ -94,9 +85,9 @@ func jobManager() {
 
 		case <-ticker.C:
 			for p := range processJobs {
-				log.Printf("Checking process %v: %v", p.jobNo, p.cmd)
-				if p.cmd.ProcessState != nil {
-					p.cmd.Wait()
+				log.Printf("Checking process %v: %v", p.JobNo, p.Cmd)
+				if p.Cmd.ProcessState != nil {
+					p.Cmd.Wait()
 					delete(processJobs, p)
 				}
 			}
@@ -105,22 +96,22 @@ func jobManager() {
 			jobList := make(jobList, 0, len(processJobs))
 			for p := range processJobs {
 				jobList = append(jobList, struct {
-					JobNo   JobNoType `json:"jobNo"`
-					CmdLine string    `json:"cmdLine"`
+					JobNo   datamodel.JobNoType `json:"jobNo"`
+					CmdLine string              `json:"cmdLine"`
 				}{
-					JobNo:   p.jobNo,
-					CmdLine: p.cmdLine,
+					JobNo:   p.JobNo,
+					CmdLine: p.CmdLine,
 				})
 			}
 			jobListResponseChannel <- jobList
 
 		case jobNo := <-jobKillChannel:
 			for p := range processJobs {
-				if p.jobNo == jobNo || jobNo == -1 {
+				if p.JobNo == jobNo || jobNo == -1 {
 					// kill the process
-					log.Printf("Killing process %v: %v", p.jobNo, p.cmd)
-					p.cmd.Process.Kill()
-					p.cmd.Wait()
+					log.Printf("Killing process %v: %v", p.JobNo, p.Cmd)
+					p.Cmd.Process.Kill()
+					p.Cmd.Wait()
 					delete(processJobs, p)
 				}
 			}
