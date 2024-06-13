@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"datamodel"
 )
 
 // Structs
@@ -23,7 +25,7 @@ type jsonCommandStruct struct {
 // jsonKillStruct represents a job to be killed.
 // note that  if job == -1, then all jobs will be killed
 type jsonKillStruct struct {
-	JobNo JobNoType `json:"job"`
+	JobNo datamodel.JobNoType `json:"job"`
 }
 
 // HTTP Handlers
@@ -115,10 +117,10 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		cmd.Wait()
 	}()
-	processChannel <- &processJobStruct{
-		cmd:     cmd,
-		jobNo:   <-jobChannel,
-		cmdLine: cmdFromForm.Cmd + " " + strings.Join(cmdFromForm.Args, " "),
+	processChannel <- &datamodel.ProcessJobStruct{
+		Cmd:     cmd,
+		JobNo:   <-jobChannel,
+		CmdLine: cmdFromForm.Cmd + " " + strings.Join(cmdFromForm.Args, " "),
 	}
 	writeJson(true, w)
 }
