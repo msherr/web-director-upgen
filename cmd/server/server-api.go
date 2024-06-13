@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"datamodel"
@@ -76,6 +77,20 @@ func handleRunToCompletion(w http.ResponseWriter, r *http.Request) {
 	}, w)
 }
 
+func writeToFile(wg *sync.WaitGroup, fileName string, s *io.ReadCloser) {
+	defer wg.Done()
+	file, err := os.Create(fileName)
+	if err != nil {
+		log.Printf("warning: cannot create file (%v): %v\n", fileName, err)
+		return
+	}
+	defer file.Close()
+	_, err = io.Copy(file, *s)
+	if err != nil {
+		log.Printf("warning: cannot write to file (%v): %v\n", fileName, err)
+	}
+}
+
 // handleRunInBackground handles the "/runInBackground" endpoint and executes a command asynchronously.
 func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 	var cmdFromForm datamodel.JsonCommandStruct
@@ -130,19 +145,14 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 			{cmdFromForm.StdoutFile, &stdout},
 			{cmdFromForm.StderrFile, &stderr},
 		}
+		var wg sync.WaitGroup
 		for _, pipePointer := range pipePointers {
 			if pipePointer.fileName != "" {
-				data, err := io.ReadAll(*pipePointer.src)
-				if err != nil {
-					log.Printf("warning: cannot read from pipe (%v): %v\n", pipePointer.fileName, err)
-					continue
-				}
-				if err := os.WriteFile(pipePointer.fileName, data, 0644); err != nil {
-					log.Printf("warning: cannot create file (%v): %v\n", pipePointer.fileName, err)
-					continue
-				}
+				go writeToFile(&wg, pipePointer.fileName, pipePointer.src)
+				wg.Add(1)
 			}
 		}
+		wg.Wait()
 		cmd.Wait()
 	}()
 
