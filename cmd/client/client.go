@@ -73,6 +73,7 @@ func makeRequest(ctx context.Context, f string, data any) {
 func main() {
 	// environment and command-line vars
 	var (
+		expName             string
 		authToken           string
 		censoredUrlEndpoint string
 		gfwUrlEndpoint      string
@@ -85,12 +86,13 @@ func main() {
 		log.Fatal("SERVER_AUTH_TOKEN not set")
 	}
 
+	flag.StringVar(&expName, "exp", "", "experiment name")
 	flag.BoolVar(&insecure, "insecure", false, "Set to disable TLS verification (on all endpoints)")
 	flag.StringVar(&gfwUrlEndpoint, "gfw_url", "", "Specify the URL endpoint for OpenGFW")
 	flag.StringVar(&censoredUrlEndpoint, "censoredvm_url", "", "Specify the URL endpoint for censored VM")
 	flag.Parse()
 
-	if gfwUrlEndpoint == "" || censoredUrlEndpoint == "" {
+	if expName == "" || gfwUrlEndpoint == "" || censoredUrlEndpoint == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -118,8 +120,8 @@ func main() {
 		TimeoutInSecs: 0,
 		Cmd:           "../OpenGFW/OpenGFW",
 		Args:          []string{"-c", "../OpenGFW/configs/config.yaml", "../OpenGFW/rules/ruleset.yaml"},
-		StdoutFile:    "OpenGFW.log",
-		StderrFile:    "OpenGFW.err",
+		StdoutFile:    "OpenGFW." + expName + ".log",
+		StderrFile:    "OpenGFW." + expName + ".err",
 	}
 	log.Println("Starting OpenGFW")
 	makeRequest(ctxGFW, "/runInBackground", startOpenGFWCommand)
