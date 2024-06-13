@@ -141,7 +141,7 @@ func main() {
 		makeRequest(ctxCensoredVM, "/runToCompletion", digCmd)
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(15 * time.Second)
 	log.Println("Killing all jobs")
 	makeRequest(ctxCensoredVM, "/kill", allJobs)
 	makeRequest(ctxGFW, "/kill", allJobs)

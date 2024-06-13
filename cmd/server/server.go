@@ -117,7 +117,7 @@ func jobManager() {
 					// kill the process
 					log.Printf("Killing process %v: %v", p.JobNo, p.Cmd)
 					p.Cmd.Process.Kill()
-					p.Cmd.Wait()
+					//p.Cmd.Wait()
 					delete(processJobs, p)
 				}
 			}
