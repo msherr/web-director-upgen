@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"datamodel"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -26,13 +27,6 @@ var allJobs = struct {
 	JobID int `json:"job"`
 }{
 	JobID: -1,
-}
-
-// jsonCommandStruct represents a command to be executed.
-type jsonCommandStruct struct {
-	TimeoutInSecs float32  `json:"timeout"` // anything positive will be considered a timeout
-	Cmd           string   `json:"cmd"`
-	Args          []string `json:"args"`
 }
 
 func makeRequest(ctx context.Context, f string, data any) {
@@ -120,10 +114,11 @@ func main() {
 	ctxGFW = context.WithValue(ctxGFW, URLEndpointKey, gfwUrlEndpoint)
 	ctxCensoredVM = context.WithValue(ctxGFW, URLEndpointKey, censoredUrlEndpoint)
 
-	startOpenGFWCommand := jsonCommandStruct{
+	startOpenGFWCommand := datamodel.JsonCommandStruct{
 		TimeoutInSecs: 0,
 		Cmd:           "../OpenGFW/OpenGFW",
 		Args:          []string{"-c", "../OpenGFW/configs/config.yaml", "../OpenGFW/rules/ruleset.yaml"},
+		StdoutFile:    "OpenGFW.log",
 	}
 	log.Println("Starting OpenGFW")
 	makeRequest(ctxGFW, "/runInBackground", startOpenGFWCommand)
@@ -132,7 +127,7 @@ func main() {
 	makeRequest(ctxGFW, "/jobs", nil)
 
 	for i := 0; i < 500; i++ {
-		digCmd := jsonCommandStruct{
+		digCmd := datamodel.JsonCommandStruct{
 			TimeoutInSecs: 0,
 			Cmd:           "dig",
 			Args: []string{
