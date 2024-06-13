@@ -68,19 +68,26 @@ func makeRequest(ctx context.Context, f string, data any) {
 }
 
 func main() {
-	authToken := os.Getenv("SERVER_AUTH_TOKEN")
+	// environment and command-line vars
+	var (
+		authToken           string
+		censoredUrlEndpoint string
+		gfwUrlEndpoint      string
+		insecure            bool
+	)
+	var ctxGFW, ctxCensoredVM context.Context
+
+	authToken = os.Getenv("SERVER_AUTH_TOKEN")
 	if authToken == "" {
 		log.Fatal("SERVER_AUTH_TOKEN not set")
 	}
 
-	var insecure bool
-	var urlEndpoint string
-
-	flag.BoolVar(&insecure, "insecure", false, "Set to true to disable TLS verification")
-	flag.StringVar(&urlEndpoint, "url", "", "Specify the URL endpoint")
+	flag.BoolVar(&insecure, "insecure", false, "Set to disable TLS verification (on all endpoints)")
+	flag.StringVar(&gfwUrlEndpoint, "gfw_url", "", "Specify the URL endpoint for OpenGFW")
+	flag.StringVar(&censoredUrlEndpoint, "censoredvm_url", "", "Specify the URL endpoint for censored VM")
 	flag.Parse()
 
-	if urlEndpoint == "" {
+	if gfwUrlEndpoint == "" || censoredUrlEndpoint == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -89,18 +96,20 @@ func main() {
 		log.Println("Warning: Skipping TLS verification")
 	}
 
-	ctx := context.WithValue(context.Background(), AuthTokenKey, authToken)
-	ctx = context.WithValue(ctx, URLEndpointKey, urlEndpoint)
-
 	tr := &http.Transport{
 		MaxIdleConns:       10,
-		IdleConnTimeout:    30 * time.Second,
+		IdleConnTimeout:    3 * time.Minute,
 		DisableCompression: true,
 		TLSClientConfig:    &tls.Config{InsecureSkipVerify: insecure}, // DANGER
 	}
 	client := &http.Client{Transport: tr}
-	ctx = context.WithValue(ctx, ClientKey, client)
 	defer client.CloseIdleConnections()
+
+	// create our contexts
+	ctxGFW = context.WithValue(context.Background(), AuthTokenKey, authToken)
+	ctxGFW = context.WithValue(ctxGFW, ClientKey, client)
+	ctxGFW = context.WithValue(ctxGFW, URLEndpointKey, gfwUrlEndpoint)
+	ctxCensoredVM = context.WithValue(ctxGFW, URLEndpointKey, censoredUrlEndpoint)
 
 	sleepCmd := jsonCommandStruct{
 		TimeoutInSecs: 0,
@@ -109,18 +118,19 @@ func main() {
 	}
 	for i := 0; i < 10; i++ {
 		fmt.Println("Requesting sleep ")
-		makeRequest(ctx, "/runInBackground", sleepCmd)
+		makeRequest(ctxCensoredVM, "/runInBackground", sleepCmd)
 	}
 
-	makeRequest(ctx, "/jobs", nil)
+	makeRequest(ctxCensoredVM, "/jobs", nil)
 
-	makeRequest(ctx, "/kill",
+	makeRequest(ctxCensoredVM, "/kill",
 		struct {
 			JobID int `json:"job"`
 		}{
 			JobID: -1,
 		})
 
-	makeRequest(ctx, "/jobs", nil)
+	makeRequest(ctxCensoredVM, "/jobs", nil)
+	makeRequest(ctxGFW, "/version", nil)
 
 }
