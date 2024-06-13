@@ -29,7 +29,8 @@
             },
             "args": [
                 "-gfw_url", "https://opengfw.cs-georgetown.net",
-                "-censoredvm_url", "https://sad-censored-vm.cs-georgetown.net"
+                "-censoredvm_url", "https://sad-censored-vm.cs-georgetown.net",
+                "-exp", "micah1"
             ]
         }
     ]

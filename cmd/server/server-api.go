@@ -135,11 +135,11 @@ func handleRunInBackground(w http.ResponseWriter, r *http.Request) {
 				data, err := io.ReadAll(*pipePointer.src)
 				if err != nil {
 					log.Printf("warning: cannot read from pipe (%v): %v\n", pipePointer.fileName, err)
-					return
+					continue
 				}
 				if err := os.WriteFile(pipePointer.fileName, data, 0644); err != nil {
 					log.Printf("warning: cannot create file (%v): %v\n", pipePointer.fileName, err)
-					return
+					continue
 				}
 			}
 		}
