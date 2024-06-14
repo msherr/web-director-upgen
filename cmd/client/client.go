@@ -5,11 +5,13 @@ import (
 	"context"
 	"crypto/tls"
 	"datamodel"
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"time"
@@ -22,6 +24,9 @@ type URLEndpointType string
 const AuthTokenKey = AuthTokenKeyType("authToken")
 const ClientKey = ClientKeyType("client")
 const URLEndpointKey = URLEndpointType("urlEndpoint")
+
+//go:embed ptadapter-obs-client.template
+var obsClientTemplate string
 
 var allJobs = struct {
 	JobID int `json:"job"`
@@ -68,6 +73,42 @@ func makeRequest(ctx context.Context, f string, data any) {
 	} else {
 		log.Fatalf("Unexpected status code from %s%s: %d", url, f, res.StatusCode)
 	}
+}
+func sendFile(ctx context.Context, fileName, fileContents string) {
+	client := ctx.Value(ClientKey).(*http.Client)
+	token := ctx.Value(AuthTokenKey).(string)
+	url := ctx.Value(URLEndpointKey).(string)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("file", fileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = io.Copy(part, bytes.NewReader([]byte(fileContents)))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = writer.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url+"/upload", body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-Session-Token", token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
 }
 
 func main() {
@@ -129,17 +170,21 @@ func main() {
 
 	makeRequest(ctxGFW, "/jobs", nil)
 
-	for i := 0; i < 150; i++ {
-		digCmd := datamodel.JsonCommandStruct{
-			TimeoutInSecs: 0,
-			Cmd:           "dig",
-			Args: []string{
-				fmt.Sprintf("thisisatest.%d.log.message", i),
-				"@10.128.0.1",
-			},
+	sendFile(ctxCensoredVM, "/tmp/ptadapter-obs-client", obsClientTemplate)
+
+	/*
+		for i := 0; i < 150; i++ {
+			digCmd := datamodel.JsonCommandStruct{
+				TimeoutInSecs: 0,
+				Cmd:           "dig",
+				Args: []string{
+					fmt.Sprintf("thisisatest.%d.log.message", i),
+					"@10.128.0.1",
+				},
+			}
+			makeRequest(ctxCensoredVM, "/runToCompletion", digCmd)
 		}
-		makeRequest(ctxCensoredVM, "/runToCompletion", digCmd)
-	}
+	*/
 
 	time.Sleep(2 * time.Second)
 	log.Println("Killing all jobs")
