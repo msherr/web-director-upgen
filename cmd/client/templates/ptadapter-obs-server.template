@@ -1,0 +1,21 @@
+[server]
+
+exec = /usr/bin/obfs4proxy
+
+state = {{ .StateDir }}
+# The state directory. Omit this line or specify an empty value to use a
+# temporary directory, which is cleaned when the PT exits.
+
+forward = 127.0.0.1:9999
+# Address and port to forward unobfuscated traffic to.
+
+tunnels = server_obfs4
+
+
+[server_obfs4]
+
+transport = obfs4
+# Name of the transport for this tunnel. Should be a supported transport method
+# of the PT.
+
+listen = 0.0.0.0:8080
