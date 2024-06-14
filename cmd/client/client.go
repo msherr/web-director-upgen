@@ -25,9 +25,6 @@ const AuthTokenKey = AuthTokenKeyType("authToken")
 const ClientKey = ClientKeyType("client")
 const URLEndpointKey = URLEndpointType("urlEndpoint")
 
-//go:embed ptadapter-obs-client.template
-var obsClientTemplate string
-
 var allJobs = struct {
 	JobID int `json:"job"`
 }{
@@ -74,7 +71,8 @@ func makeRequest(ctx context.Context, f string, data any) {
 		log.Fatalf("Unexpected status code from %s%s: %d", url, f, res.StatusCode)
 	}
 }
-func sendFile(ctx context.Context, fileName, fileContents string) {
+
+func sendFile(ctx context.Context, fileName string, fileContents []byte) {
 	client := ctx.Value(ClientKey).(*http.Client)
 	token := ctx.Value(AuthTokenKey).(string)
 	url := ctx.Value(URLEndpointKey).(string)
@@ -86,13 +84,12 @@ func sendFile(ctx context.Context, fileName, fileContents string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = io.Copy(part, bytes.NewReader([]byte(fileContents)))
+	_, err = io.Copy(part, bytes.NewReader(fileContents))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = writer.Close()
-	if err != nil {
+	if err = writer.Close(); err != nil {
 		log.Fatal(err)
 	}
 
@@ -118,9 +115,10 @@ func main() {
 		authToken           string
 		censoredUrlEndpoint string
 		gfwUrlEndpoint      string
+		bridgeUrlEndpoint   string
 		insecure            bool
 	)
-	var ctxGFW, ctxCensoredVM context.Context
+	var ctxGFW, ctxCensoredVM, ctxBridge context.Context
 
 	authToken = os.Getenv("SERVER_AUTH_TOKEN")
 	if authToken == "" {
@@ -131,9 +129,11 @@ func main() {
 	flag.BoolVar(&insecure, "insecure", false, "Set to disable TLS verification (on all endpoints)")
 	flag.StringVar(&gfwUrlEndpoint, "gfw_url", "", "Specify the URL endpoint for OpenGFW")
 	flag.StringVar(&censoredUrlEndpoint, "censoredvm_url", "", "Specify the URL endpoint for censored VM")
+	flag.StringVar(&bridgeUrlEndpoint, "bridge_url", "", "Specify the URL endpoint for the bridge")
 	flag.Parse()
 
-	if expName == "" || gfwUrlEndpoint == "" || censoredUrlEndpoint == "" {
+	if expName == "" || gfwUrlEndpoint == "" ||
+		censoredUrlEndpoint == "" || bridgeUrlEndpoint == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -156,6 +156,10 @@ func main() {
 	ctxGFW = context.WithValue(ctxGFW, ClientKey, client)
 	ctxGFW = context.WithValue(ctxGFW, URLEndpointKey, gfwUrlEndpoint)
 	ctxCensoredVM = context.WithValue(ctxGFW, URLEndpointKey, censoredUrlEndpoint)
+	ctxBridge = context.WithValue(ctxGFW, URLEndpointKey, bridgeUrlEndpoint)
+
+	// first, send the server.tgen.graphml file to the bridge
+	graphMLBytes := getServerTgen()
 
 	startOpenGFWCommand := datamodel.JsonCommandStruct{
 		TimeoutInSecs: 0,
@@ -170,7 +174,8 @@ func main() {
 
 	makeRequest(ctxGFW, "/jobs", nil)
 
-	sendFile(ctxCensoredVM, "/tmp/ptadapter-obs-client", obsClientTemplate)
+	obsClientTemplate := getObsClientTemplate()
+	sendFile(ctxCensoredVM, "ptadapter-obs-client", obsClientTemplate)
 
 	/*
 		for i := 0; i < 150; i++ {
