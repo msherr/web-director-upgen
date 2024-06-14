@@ -189,3 +189,43 @@ func handleKillJob(w http.ResponseWriter, r *http.Request) {
 	jobKillChannel <- jsonKill.JobNo
 	writeJson(true, w)
 }
+
+func handleUploadFile(w http.ResponseWriter, r *http.Request) {
+	// Check if the request method is POST
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse the multipart form data
+	err := r.ParseMultipartForm(32 << 20) // 32MB
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Get the file from the form data
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Failed to get file from form data", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Create a new file on the server to store the uploaded file
+	dst, err := os.Create(handler.Filename)
+	if err != nil {
+		http.Error(w, "Failed to create file on server", http.StatusInternalServerError)
+		return
+	}
+	defer dst.Close()
+
+	// Copy the contents of the uploaded file to the destination file
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		http.Error(w, "Failed to copy file contents", http.StatusInternalServerError)
+		return
+	}
+
+	writeJson(true, w)
+}

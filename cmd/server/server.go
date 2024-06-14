@@ -157,6 +157,8 @@ func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler 
 	})
 }
 
+// handleUploadFile handles the client's file upload request.
+
 // Main Function
 
 func main() {
@@ -190,6 +192,7 @@ func main() {
 	r.HandleFunc("/runInBackground", handleRunInBackground)
 	r.HandleFunc("/jobs", handleJobList)
 	r.HandleFunc("/kill", handleKillJob)
+	r.HandleFunc("/upload", handleUploadFile)
 
 	amw := authenticationMiddleware{}
 	amw.Init()
