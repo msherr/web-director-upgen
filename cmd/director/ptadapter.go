@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"log"
 	"os"
-	"text/template"
 )
 
 func getObsClientTemplate() []byte {
@@ -15,6 +13,7 @@ func getObsClientTemplate() []byte {
 	return obsClientTemplate
 }
 
+/*
 func getObsServerTemplate(statedir string) ([]byte, error) {
 	obsServerTemplate, err := os.ReadFile("templates/ptadapter-obs-server.template")
 	if err != nil {
@@ -42,3 +41,4 @@ func getObsServerTemplate(statedir string) ([]byte, error) {
 
 	return parsedTemplate.Bytes(), nil
 }
+*/
