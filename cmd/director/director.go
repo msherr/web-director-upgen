@@ -31,7 +31,7 @@ var allJobs = struct {
 	JobID: -1,
 }
 
-func makeRequest(ctx context.Context, f string, data any) {
+func makeRequest(ctx context.Context, f string, data any) int {
 	var err error
 	var req *http.Request
 
@@ -56,6 +56,7 @@ func makeRequest(ctx context.Context, f string, data any) {
 		"X-Session-Token": {token},
 		"Content-Type":    {"application/json"},
 	}
+	log.Printf("Making request to %v: %v\n", url+f, req)
 	res, err := client.Do(req)
 	if err != nil {
 		log.Fatal(err)
@@ -70,9 +71,10 @@ func makeRequest(ctx context.Context, f string, data any) {
 	} else {
 		log.Fatalf("Unexpected status code from %s%s: %d", url, f, res.StatusCode)
 	}
+	return res.StatusCode
 }
 
-func sendFile(ctx context.Context, fileName string, fileContents []byte) {
+func sendFile(ctx context.Context, fileName string, fileContents []byte) int {
 	client := ctx.Value(ClientKey).(*http.Client)
 	token := ctx.Value(AuthTokenKey).(string)
 	url := ctx.Value(URLEndpointKey).(string)
@@ -106,6 +108,57 @@ func sendFile(ctx context.Context, fileName string, fileContents []byte) {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
+	log.Printf("sent file %s to %s\n", fileName, url)
+	return resp.StatusCode
+}
+
+// starts the bridge
+func startBridge(ctxBridge context.Context, expName, tgenPath string) {
+	// step 0: make sure that nothing else is running
+	makeRequest(ctxBridge, "/kill", allJobs)
+	time.Sleep(2 * time.Second)
+
+	// next, send the server.tgen.graphml file to the bridge
+	graphMLBytes := getServerTgen()
+	if res := sendFile(ctxBridge, "server.tgen.graphml", graphMLBytes); res != http.StatusOK {
+		log.Fatal("could not send server.tgen.graphml to bridge")
+	}
+
+	// next, cause the bridge to call tgen on that file
+	tgenCmd := datamodel.JsonCommandStruct{
+		TimeoutInSecs: 0,
+		Cmd:           tgenPath,
+		Args:          []string{"server.tgen.graphml"},
+		StdoutFile:    "tgen.bridge." + expName + ".log",
+		StderrFile:    "tgen.bridge." + expName + ".err",
+	}
+	if res := makeRequest(ctxBridge, "/runInBackground", tgenCmd); res != http.StatusOK {
+		log.Fatal("could not start tgen on bridge")
+	}
+
+	// report out what's running
+	makeRequest(ctxBridge, "/jobs", nil)
+}
+
+func startOpenGFW(ctxGFW context.Context, expName string) {
+	// step 0: make sure that nothing else is running
+	makeRequest(ctxGFW, "/kill", allJobs)
+	time.Sleep(2 * time.Second)
+
+	startOpenGFWCommand := datamodel.JsonCommandStruct{
+		TimeoutInSecs: 0,
+		Cmd:           "../OpenGFW/OpenGFW",
+		Args:          []string{"-c", "../OpenGFW/configs/config.yaml", "../OpenGFW/rules/ruleset.yaml"},
+		StdoutFile:    "OpenGFW." + expName + ".log",
+		StderrFile:    "OpenGFW." + expName + ".err",
+	}
+	log.Println("Starting OpenGFW")
+	if res := makeRequest(ctxGFW, "/runInBackground", startOpenGFWCommand); res != http.StatusOK {
+		log.Fatal("could not start OpenGFW")
+	}
+	time.Sleep(2 * time.Second)
+
+	makeRequest(ctxGFW, "/jobs", nil)
 }
 
 func main() {
@@ -116,6 +169,8 @@ func main() {
 		censoredUrlEndpoint string
 		gfwUrlEndpoint      string
 		bridgeUrlEndpoint   string
+		ptAdapterPath       string
+		tgenPath            string
 		insecure            bool
 	)
 	var ctxGFW, ctxCensoredVM, ctxBridge context.Context
@@ -130,6 +185,8 @@ func main() {
 	flag.StringVar(&gfwUrlEndpoint, "gfw_url", "", "Specify the URL endpoint for OpenGFW")
 	flag.StringVar(&censoredUrlEndpoint, "censoredvm_url", "", "Specify the URL endpoint for censored VM")
 	flag.StringVar(&bridgeUrlEndpoint, "bridge_url", "", "Specify the URL endpoint for the bridge")
+	flag.StringVar(&ptAdapterPath, "ptadapter", "/usr/local/bin/ptadapter", "path to ptadapter on both bridge and censored VM")
+	flag.StringVar(&tgenPath, "tgen", "/usr/local/bin/tgen", "path to tgen on both bridge and censored VM")
 	flag.Parse()
 
 	if expName == "" || gfwUrlEndpoint == "" ||
@@ -143,10 +200,11 @@ func main() {
 	}
 
 	tr := &http.Transport{
-		MaxIdleConns:       10,
-		IdleConnTimeout:    3 * time.Minute,
-		DisableCompression: true,
-		TLSClientConfig:    &tls.Config{InsecureSkipVerify: insecure}, // DANGER
+		MaxIdleConns:        10,
+		IdleConnTimeout:     3 * time.Minute,
+		DisableCompression:  true,
+		TLSHandshakeTimeout: 5 * time.Second,
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: insecure}, // DANGER
 	}
 	client := &http.Client{Transport: tr}
 	defer client.CloseIdleConnections()
@@ -158,21 +216,9 @@ func main() {
 	ctxCensoredVM = context.WithValue(ctxGFW, URLEndpointKey, censoredUrlEndpoint)
 	ctxBridge = context.WithValue(ctxGFW, URLEndpointKey, bridgeUrlEndpoint)
 
-	// first, send the server.tgen.graphml file to the bridge
-	graphMLBytes := getServerTgen()
-
-	startOpenGFWCommand := datamodel.JsonCommandStruct{
-		TimeoutInSecs: 0,
-		Cmd:           "../OpenGFW/OpenGFW",
-		Args:          []string{"-c", "../OpenGFW/configs/config.yaml", "../OpenGFW/rules/ruleset.yaml"},
-		StdoutFile:    "OpenGFW." + expName + ".log",
-		StderrFile:    "OpenGFW." + expName + ".err",
-	}
-	log.Println("Starting OpenGFW")
-	makeRequest(ctxGFW, "/runInBackground", startOpenGFWCommand)
-	time.Sleep(2 * time.Second)
-
-	makeRequest(ctxGFW, "/jobs", nil)
+	// --- start the experiment ---
+	startBridge(ctxBridge, expName, tgenPath) // start the bridge
+	startOpenGFW(ctxGFW, expName)             // start OpenGFW
 
 	obsClientTemplate := getObsClientTemplate()
 	sendFile(ctxCensoredVM, "ptadapter-obs-client", obsClientTemplate)
@@ -191,8 +237,9 @@ func main() {
 		}
 	*/
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(60 * time.Second)
 	log.Println("Killing all jobs")
 	makeRequest(ctxCensoredVM, "/kill", allJobs)
 	makeRequest(ctxGFW, "/kill", allJobs)
+	makeRequest(ctxBridge, "/kill", allJobs)
 }

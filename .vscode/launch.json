@@ -14,22 +14,24 @@
                 "SERVER_AUTH_TOKEN": "micah1"
             },
             "args": [
-                "-certpath", "mytest.pem",
-                "-keypath", "mytest-key.pem"
+                "-certpath", "/tmp/foobar.org.pem",
+                "-keypath", "/tmp/foobar.org-key.pem",
+                "-user", "msherr"
             ]
         },
         {
-            "name": "client",
+            "name": "director",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${fileDirname}",
+            "program": "${workspaceFolder}/cmd/director",
             "env" : {
                 "SERVER_AUTH_TOKEN": "krjci4k5xlfkmafdkrt,gfgklfa"
             },
             "args": [
                 "-gfw_url", "https://opengfw.cs-georgetown.net",
                 "-censoredvm_url", "https://sad-censored-vm.cs-georgetown.net",
+                "-bridge_url", "https://spare.cs-georgetown.net",
                 "-exp", "micah1"
             ]
         }
