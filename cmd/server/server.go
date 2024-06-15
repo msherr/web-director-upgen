@@ -16,12 +16,16 @@ intended for managing experiments.
 package main
 
 import (
+	"crypto/tls"
 	"datamodel"
 	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
 	"os"
+	"os/user"
+	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -166,11 +170,13 @@ func main() {
 		certPath string
 		keyPath  string
 		port     string
+		username string
 	)
 
 	flag.StringVar(&certPath, "certpath", "", "Path to the certificate file")
 	flag.StringVar(&keyPath, "keypath", "", "Path to the key file")
-	flag.StringVar(&port, "port", "8888", "Port number to listen on")
+	flag.StringVar(&port, "port", "443", "Port number to listen on")
+	flag.StringVar(&username, "user", "", "User to run as")
 	flag.Parse()
 
 	if certPath == "" || keyPath == "" {
@@ -180,6 +186,18 @@ func main() {
 
 	log.Println("Certificate Path:", certPath)
 	log.Println("Key Path:", keyPath)
+
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var tlsconf tls.Config
+	tlsconf.Certificates = make([]tls.Certificate, 1)
+	tlsconf.Certificates[0] = cert
+	listener, err := tls.Listen("tcp4", ":"+port, &tlsconf)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	go jobManager()
 	go produceNextJobNumber()
@@ -198,6 +216,22 @@ func main() {
 	amw.Init()
 	r.Use(amw.Middleware)
 
+	if username != "" {
+		log.Printf("switching to user %s", username)
+		userInfo, err := user.Lookup(username)
+		if err != nil {
+			log.Fatal(err)
+		}
+		uid, err := strconv.ParseInt(userInfo.Uid, 10, 32)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := syscall.Seteuid(int(uid)); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("now running as user %s", username)
+	}
+
 	log.Println("Server starting on port " + port)
-	log.Fatal(http.ListenAndServeTLS(":"+port, certPath, keyPath, r))
+	log.Fatal(http.Serve(listener, r))
 }
