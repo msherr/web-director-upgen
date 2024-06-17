@@ -1,19 +1,16 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"datamodel"
 	_ "embed"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -25,103 +22,46 @@ const AuthTokenKey = AuthTokenKeyType("authToken")
 const ClientKey = ClientKeyType("client")
 const URLEndpointKey = URLEndpointType("urlEndpoint")
 
+type TransportType int
+
+const (
+	undefinedTransport TransportType = iota
+	obfsTransport
+	proteusTransport
+)
+
 var allJobs = struct {
 	JobID int `json:"job"`
 }{
 	JobID: -1,
 }
 
-func makeRequest(ctx context.Context, f string, data any) int {
-	var err error
-	var req *http.Request
-
-	url := ctx.Value(URLEndpointKey).(string)
-
-	if data != nil {
-		var j []byte
-		j, err = json.Marshal(data)
-		if err != nil {
-			log.Fatal(err)
-		}
-		req, err = http.NewRequest("GET", url+f, bytes.NewBuffer(j))
-	} else {
-		req, err = http.NewRequest("GET", url+f, nil)
-	}
-	if err != nil {
-		log.Fatal(err)
-	}
-	client := ctx.Value(ClientKey).(*http.Client)
-	token := ctx.Value(AuthTokenKey).(string)
-	req.Header = http.Header{
-		"X-Session-Token": {token},
-		"Content-Type":    {"application/json"},
-	}
-	log.Printf("Making request to %v: %v\n", url+f, req)
-	res, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if res.StatusCode == http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("Response from %s%s:\n\n", url, f)
-		fmt.Println(string(b))
-	} else {
-		log.Fatalf("Unexpected status code from %s%s: %d", url, f, res.StatusCode)
-	}
-	return res.StatusCode
-}
-
-func sendFile(ctx context.Context, fileName string, fileContents []byte) int {
-	client := ctx.Value(ClientKey).(*http.Client)
-	token := ctx.Value(AuthTokenKey).(string)
-	url := ctx.Value(URLEndpointKey).(string)
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	part, err := writer.CreateFormFile("file", fileName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	_, err = io.Copy(part, bytes.NewReader(fileContents))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err = writer.Close(); err != nil {
-		log.Fatal(err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, url+"/upload", body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("X-Session-Token", token)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-	log.Printf("sent file %s to %s\n", fileName, url)
-	return resp.StatusCode
+func (t TransportType) String() string {
+	return [...]string{"undefined", "obfs", "proteus"}[t]
 }
 
 // starts the bridge
-func startBridge(ctxBridge context.Context, expName, tgenPath string) {
-	// step 0: make sure that nothing else is running
-	makeRequest(ctxBridge, "/kill", allJobs)
-	time.Sleep(2 * time.Second)
+func startBridge(ctxBridge context.Context, transportType TransportType, configNum int, expName, tgenPath, ptAdapterPath string) {
 
-	// next, send the server.tgen.graphml file to the bridge
+	// send the server.tgen.graphml file to the bridge
 	graphMLBytes := getServerTgen()
 	if res := sendFile(ctxBridge, "server.tgen.graphml", graphMLBytes); res != http.StatusOK {
 		log.Fatal("could not send server.tgen.graphml to bridge")
+	}
+
+	var ptAdapterConfigBytes []byte
+
+	switch transportType {
+	case undefinedTransport:
+		log.Fatal("transport type not defined")
+	case obfsTransport:
+		ptAdapterConfigBytes = getObfsPTAdapterServerTemplate(configNum)
+	case proteusTransport:
+		log.Fatal("Proteus transport not implemented yet")
+	}
+
+	if res := sendFile(ctxBridge, "ptadapter.server.conf", ptAdapterConfigBytes); res != http.StatusOK {
+		log.Fatal("could not send ptadapter.server.conf to bridge")
 	}
 
 	// next, cause the bridge to call tgen on that file
@@ -129,11 +69,23 @@ func startBridge(ctxBridge context.Context, expName, tgenPath string) {
 		TimeoutInSecs: 0,
 		Cmd:           tgenPath,
 		Args:          []string{"server.tgen.graphml"},
-		StdoutFile:    "tgen.bridge." + expName + ".log",
-		StderrFile:    "tgen.bridge." + expName + ".err",
+		StdoutFile:    fmt.Sprintf("tgen.bridge.%s.%d.log", expName, configNum),
+		StderrFile:    fmt.Sprintf("tgen.bridge.%s.%d.err", expName, configNum),
 	}
 	if res := makeRequest(ctxBridge, "/runInBackground", tgenCmd); res != http.StatusOK {
 		log.Fatal("could not start tgen on bridge")
+	}
+
+	// next, cause the bridge to call ptadapter
+	ptAdapterCommand := datamodel.JsonCommandStruct{
+		TimeoutInSecs: 0,
+		Cmd:           ptAdapterPath,
+		Args:          []string{"-S", "ptadapter.server.conf"},
+		StdoutFile:    fmt.Sprintf("ptadapter.bridge.%s.%d.log", expName, configNum),
+		StderrFile:    fmt.Sprintf("ptadapter.bridge.%s.%d.err", expName, configNum),
+	}
+	if res := makeRequest(ctxBridge, "/runInBackground", ptAdapterCommand); res != http.StatusOK {
+		log.Fatal("could not start ptadapter on bridge")
 	}
 
 	// report out what's running
@@ -141,9 +93,6 @@ func startBridge(ctxBridge context.Context, expName, tgenPath string) {
 }
 
 func startOpenGFW(ctxGFW context.Context, expName string) {
-	// step 0: make sure that nothing else is running
-	makeRequest(ctxGFW, "/kill", allJobs)
-	time.Sleep(2 * time.Second)
 
 	startOpenGFWCommand := datamodel.JsonCommandStruct{
 		TimeoutInSecs: 0,
@@ -159,6 +108,13 @@ func startOpenGFW(ctxGFW context.Context, expName string) {
 	time.Sleep(2 * time.Second)
 
 	makeRequest(ctxGFW, "/jobs", nil)
+}
+
+func stopAllJobs(ctxs []*context.Context) {
+	log.Println("stopping all jobs")
+	for _, ctx := range ctxs {
+		makeRequest(*ctx, "/kill", allJobs)
+	}
 }
 
 func main() {
@@ -216,26 +172,42 @@ func main() {
 	ctxCensoredVM = context.WithValue(ctxGFW, URLEndpointKey, censoredUrlEndpoint)
 	ctxBridge = context.WithValue(ctxGFW, URLEndpointKey, bridgeUrlEndpoint)
 
-	// --- start the experiment ---
-	startBridge(ctxBridge, expName, tgenPath) // start the bridge
-	startOpenGFW(ctxGFW, expName)             // start OpenGFW
+	// make sure everything is shut down
+	stopAllJobs([]*context.Context{&ctxGFW, &ctxCensoredVM, &ctxBridge})
+	time.Sleep(2 * time.Second)
 
-	obsClientTemplate := getObsClientTemplate()
-	sendFile(ctxCensoredVM, "ptadapter-obs-client", obsClientTemplate)
+	// start OpenGFW
+	startOpenGFW(ctxGFW, expName)
 
-	/*
-		for i := 0; i < 150; i++ {
+	for ttype := range []TransportType{obfsTransport, proteusTransport} {
+		for configNum := 1; configNum <= 10000; configNum++ {
+
+			// make sure bridge and client aren't doing anything
+			stopAllJobs([]*context.Context{&ctxCensoredVM, &ctxBridge})
+			time.Sleep(2 * time.Second)
+
+			// notify opengfw of our configuration
 			digCmd := datamodel.JsonCommandStruct{
 				TimeoutInSecs: 0,
 				Cmd:           "dig",
 				Args: []string{
-					fmt.Sprintf("thisisatest.%d.log.message", i),
-					"@10.128.0.1",
+					fmt.Sprintf("exp_%s.trans_%v.iter_%d.log.message",
+						strings.ReplaceAll(expName, " ", ""),
+						ttype,
+						configNum),
 				},
 			}
 			makeRequest(ctxCensoredVM, "/runToCompletion", digCmd)
+
+			// start ptadapter and tgen on the bridge
+			startBridge(ctxBridge, obfsTransport, configNum, expName, tgenPath, ptAdapterPath)
+
+			// TODO: start ptadapter on the censored VM STOPPED HERE
+			obsClientTemplate := getObsClientTemplate()
+			sendFile(ctxCensoredVM, "ptadapter-obs-client", obsClientTemplate)
+
 		}
-	*/
+	}
 
 	time.Sleep(60 * time.Second)
 	log.Println("Killing all jobs")
