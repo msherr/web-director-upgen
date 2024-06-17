@@ -48,6 +48,13 @@ func startBridge(ctxBridge context.Context, transportType TransportType, configN
 	if res := sendFile(ctxBridge, "server.tgen.graphml", graphMLBytes); res != http.StatusOK {
 		log.Fatal("could not send server.tgen.graphml to bridge")
 	}
+	// extract certificate files and send them to bridge
+	m := getObsCertificates(configNum)
+	for k, v := range m {
+		if res := sendFile(ctxBridge, k, v); res != http.StatusOK {
+			log.Fatalf("could not send %s to bridge", k)
+		}
+	}
 
 	var ptAdapterConfigBytes []byte
 
@@ -55,7 +62,7 @@ func startBridge(ctxBridge context.Context, transportType TransportType, configN
 	case undefinedTransport:
 		log.Fatal("transport type not defined")
 	case obfsTransport:
-		ptAdapterConfigBytes = getObfsPTAdapterServerTemplate(configNum)
+		ptAdapterConfigBytes = getObfsPTAdapterServerTemplate()
 	case proteusTransport:
 		log.Fatal("Proteus transport not implemented yet")
 	}
@@ -90,6 +97,61 @@ func startBridge(ctxBridge context.Context, transportType TransportType, configN
 
 	// report out what's running
 	makeRequest(ctxBridge, "/jobs", nil)
+}
+
+// starts the bridge
+func startClient(ctxCensoredVM context.Context, transportType TransportType, configNum int, expName, tgenPath, ptAdapterPath, bridgeHostname string) {
+
+	// send the client.tgen.graphml file to the bridge
+	graphMLBytes := getClientTgen()
+	if res := sendFile(ctxCensoredVM, "client.tgen.graphml", graphMLBytes); res != http.StatusOK {
+		log.Fatal("could not send client.tgen.graphml to bridge")
+	}
+
+	// extract certificate
+	m := getObsCertificates(configNum)
+	certString := getObsCertificatePart(m["obfs4_bridgeline.txt"])
+
+	var ptAdapterConfigBytes []byte
+
+	switch transportType {
+	case undefinedTransport:
+		log.Fatal("transport type not defined")
+	case obfsTransport:
+		ptAdapterConfigBytes = getObfsPTAdapterClientTemplate(certString, bridgeHostname)
+	case proteusTransport:
+		log.Fatal("Proteus transport not implemented yet")
+	}
+
+	if res := sendFile(ctxCensoredVM, "ptadapter.client.conf", ptAdapterConfigBytes); res != http.StatusOK {
+		log.Fatal("could not send ptadapter.client.conf to client")
+	}
+
+	// next, cause the censoredVM to call ptadapter
+	ptAdapterCommand := datamodel.JsonCommandStruct{
+		TimeoutInSecs: 0,
+		Cmd:           ptAdapterPath,
+		Args:          []string{"-C", "ptadapter.client.conf"},
+		StdoutFile:    fmt.Sprintf("ptadapter.client.%s.%d.log", expName, configNum),
+		StderrFile:    fmt.Sprintf("ptadapter.client.%s.%d.err", expName, configNum),
+	}
+	if res := makeRequest(ctxCensoredVM, "/runInBackground", ptAdapterCommand); res != http.StatusOK {
+		log.Fatal("could not start ptadapter on client")
+	}
+
+	// next, cause the bridge to call tgen on that file
+	tgenCmd := datamodel.JsonCommandStruct{
+		TimeoutInSecs: 0,
+		Cmd:           tgenPath,
+		Args:          []string{"client.tgen.graphml"},
+		StdoutFile:    fmt.Sprintf("tgen.client.%s.%d.log", expName, configNum),
+		StderrFile:    fmt.Sprintf("tgen.client.%s.%d.err", expName, configNum),
+	}
+	log.Println("running tgen on censored VM...")
+	if res := makeRequest(ctxCensoredVM, "/runToCompletion", tgenCmd); res != http.StatusOK {
+		log.Fatal("could not start tgen on client")
+	}
+	log.Println("tgen finished on censored VM")
 }
 
 func startOpenGFW(ctxGFW context.Context, expName string) {
@@ -150,6 +212,7 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+	bridgeHostname := grabDomainFromURL(bridgeUrlEndpoint)
 
 	if insecure {
 		log.Println("Warning: Skipping TLS verification")
@@ -202,9 +265,8 @@ func main() {
 			// start ptadapter and tgen on the bridge
 			startBridge(ctxBridge, obfsTransport, configNum, expName, tgenPath, ptAdapterPath)
 
-			// TODO: start ptadapter on the censored VM STOPPED HERE
-			obsClientTemplate := getObsClientTemplate()
-			sendFile(ctxCensoredVM, "ptadapter-obs-client", obsClientTemplate)
+			// start tgen and ptadapter on the censored VM
+			startClient(ctxCensoredVM, obfsTransport, configNum, expName, tgenPath, ptAdapterPath, bridgeHostname)
 
 		}
 	}

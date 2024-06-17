@@ -2,7 +2,7 @@
 
 exec = /usr/bin/obfs4proxy
 
-state = {{ .StateDir }}
+state = ./
 # The state directory. Omit this line or specify an empty value to use a
 # temporary directory, which is cleaned when the PT exits.
 

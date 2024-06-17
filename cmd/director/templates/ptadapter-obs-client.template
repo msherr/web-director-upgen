@@ -2,7 +2,7 @@
 
 exec = /usr/bin/obfs4proxy
 
-state = {{.Statedir}}
+state = ./
 
 tunnels = client_obfs4
 

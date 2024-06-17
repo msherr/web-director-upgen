@@ -9,6 +9,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 )
 
 func makeRequest(ctx context.Context, f string, data any) int {
@@ -90,4 +91,12 @@ func sendFile(ctx context.Context, fileName string, fileContents []byte) int {
 	defer resp.Body.Close()
 	log.Printf("sent file %s to %s\n", fileName, url)
 	return resp.StatusCode
+}
+
+func grabDomainFromURL(urlString string) string {
+	u, err := url.Parse(urlString)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return u.Hostname()
 }

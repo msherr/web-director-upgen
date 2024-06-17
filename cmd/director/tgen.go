@@ -12,3 +12,11 @@ func getServerTgen() []byte {
 	}
 	return serverTgen
 }
+
+func getClientTgen() []byte {
+	clientTgen, err := os.ReadFile("templates/client.tgen.graphml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return clientTgen
+}
