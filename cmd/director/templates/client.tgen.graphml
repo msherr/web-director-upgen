@@ -20,7 +20,7 @@
     </node>
     <node id="end">
       <data key="d0">30 seconds</data>
-      <data key="d6">3</data>
+      <data key="d6">1</data>
       <data key="d5">5 MiB</data>
       <data key="d4">5 MiB</data>
     </node>

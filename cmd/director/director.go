@@ -155,10 +155,10 @@ func startClient(ctxCensoredVM context.Context, transportType TransportType, con
 		StderrFile:    fmt.Sprintf("tgen.client.%s.%d.err", expName, configNum),
 	}
 	log.Println("running tgen on censored VM...")
-	if res := makeRequest(ctxCensoredVM, "/runToCompletion", tgenCmd); res != http.StatusOK {
+	if res := makeRequest(ctxCensoredVM, "/runInBackground", tgenCmd); res != http.StatusOK {
 		log.Fatal("could not start tgen on client")
 	}
-	log.Println("tgen finished on censored VM")
+	time.Sleep(10 * time.Second)
 }
 
 func startOpenGFW(ctxGFW context.Context, expName string) {
