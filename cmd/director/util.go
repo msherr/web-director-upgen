@@ -9,7 +9,6 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 )
 
 func makeRequest(ctx context.Context, f string, data any) int {
@@ -50,7 +49,7 @@ func makeRequest(ctx context.Context, f string, data any) int {
 		fmt.Printf("Response from %s%s:\n\n", url, f)
 		fmt.Println(string(b))
 	} else {
-		log.Fatalf("Unexpected status code from %s%s: %d", url, f, res.StatusCode)
+		log.Printf("Unexpected status code from %s%s: %d", url, f, res.StatusCode)
 	}
 	return res.StatusCode
 }
@@ -91,12 +90,4 @@ func sendFile(ctx context.Context, fileName string, fileContents []byte) int {
 	defer resp.Body.Close()
 	log.Printf("sent file %s to %s\n", fileName, url)
 	return resp.StatusCode
-}
-
-func grabDomainFromURL(urlString string) string {
-	u, err := url.Parse(urlString)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return u.Hostname()
 }

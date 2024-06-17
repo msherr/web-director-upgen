@@ -99,8 +99,15 @@ func startBridge(ctxBridge context.Context, transportType TransportType, configN
 	makeRequest(ctxBridge, "/jobs", nil)
 }
 
-// starts the bridge
+// starts the censored client
 func startClient(ctxCensoredVM context.Context, transportType TransportType, configNum int, expName, tgenPath, ptAdapterPath, bridgeHostname string) {
+
+	// make sure that all tgen processes are really dead
+	killTGen := datamodel.JsonCommandStruct{
+		Cmd:  "/usr/bin/killall",
+		Args: []string{"tgen"},
+	}
+	makeRequest(ctxCensoredVM, "/runToCompletion", killTGen)
 
 	// send the client.tgen.graphml file to the bridge
 	graphMLBytes := getClientTgen()
@@ -189,6 +196,7 @@ func main() {
 		bridgeUrlEndpoint   string
 		ptAdapterPath       string
 		tgenPath            string
+		bridgeByIP          string
 		insecure            bool
 	)
 	var ctxGFW, ctxCensoredVM, ctxBridge context.Context
@@ -203,16 +211,16 @@ func main() {
 	flag.StringVar(&gfwUrlEndpoint, "gfw_url", "", "Specify the URL endpoint for OpenGFW")
 	flag.StringVar(&censoredUrlEndpoint, "censoredvm_url", "", "Specify the URL endpoint for censored VM")
 	flag.StringVar(&bridgeUrlEndpoint, "bridge_url", "", "Specify the URL endpoint for the bridge")
+	flag.StringVar(&bridgeByIP, "bridge_ip", "", "Bridge's IP address")
 	flag.StringVar(&ptAdapterPath, "ptadapter", "/usr/local/bin/ptadapter", "path to ptadapter on both bridge and censored VM")
 	flag.StringVar(&tgenPath, "tgen", "/usr/local/bin/tgen", "path to tgen on both bridge and censored VM")
 	flag.Parse()
 
-	if expName == "" || gfwUrlEndpoint == "" ||
+	if expName == "" || gfwUrlEndpoint == "" || bridgeByIP == "" ||
 		censoredUrlEndpoint == "" || bridgeUrlEndpoint == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
-	bridgeHostname := grabDomainFromURL(bridgeUrlEndpoint)
 
 	if insecure {
 		log.Println("Warning: Skipping TLS verification")
@@ -258,6 +266,7 @@ func main() {
 						strings.ReplaceAll(expName, " ", ""),
 						ttype,
 						configNum),
+					"@" + bridgeByIP,
 				},
 			}
 			makeRequest(ctxCensoredVM, "/runToCompletion", digCmd)
@@ -266,7 +275,7 @@ func main() {
 			startBridge(ctxBridge, obfsTransport, configNum, expName, tgenPath, ptAdapterPath)
 
 			// start tgen and ptadapter on the censored VM
-			startClient(ctxCensoredVM, obfsTransport, configNum, expName, tgenPath, ptAdapterPath, bridgeHostname)
+			startClient(ctxCensoredVM, obfsTransport, configNum, expName, tgenPath, ptAdapterPath, bridgeByIP)
 
 		}
 	}
