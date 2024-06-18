@@ -5,30 +5,33 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	_ "embed"
 	"fmt"
 	"html/template"
 	"io"
 	"log"
-	"os"
 	"path/filepath"
 	"regexp"
 )
 
 type FileMap map[string][]byte
 
+//go:embed templates/obfs-10k-certs.tar.gz
+var tarballBytes []byte
+
+//go:embed templates/ptadapter-obs-client.template
+var ptAdapterObsClientTemplateBytes []byte
+
+//go:embed templates/ptadapter-obs-server.template
+var ptAdapterObsServerTemplateBytes []byte
+
 func getObsCertificates(configNum int) FileMap {
-	const tarballPath = "templates/obfs-10k-certs.tar.gz"
 
 	pattern := fmt.Sprintf("state.%d/*", configNum)
 
-	file, err := os.Open(tarballPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
 	// Create a gzip reader
-	gzipReader, err := gzip.NewReader(file)
+	br := bytes.NewReader(tarballBytes)
+	gzipReader, err := gzip.NewReader(br)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -80,20 +83,11 @@ func getObsCertificatePart(b []byte) string {
 }
 
 func getObfsPTAdapterServerTemplate() []byte {
-	ptAdapterTemplate, err := os.ReadFile("templates/ptadapter-obs-server.template")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return ptAdapterTemplate
+	return ptAdapterObsServerTemplateBytes
 }
 
 func getObfsPTAdapterClientTemplate(certFile, bridgeHostname string) []byte {
-	ptAdapterTemplate, err := os.ReadFile("templates/ptadapter-obs-client.template")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	tmpl, err := template.New("obsClientTemplate").Parse(string(ptAdapterTemplate))
+	tmpl, err := template.New("obsClientTemplate").Parse(string(ptAdapterObsClientTemplateBytes))
 	if err != nil {
 		log.Fatal(err)
 	}
