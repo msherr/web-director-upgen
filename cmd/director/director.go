@@ -165,8 +165,8 @@ func startOpenGFW(ctxGFW context.Context, expName string) {
 
 	startOpenGFWCommand := datamodel.JsonCommandStruct{
 		TimeoutInSecs: 0,
-		Cmd:           "../OpenGFW/OpenGFW",
-		Args:          []string{"-c", "../OpenGFW/configs/config.yaml", "../OpenGFW/rules/ruleset.yaml"},
+		Cmd:           "../../OpenGFW/OpenGFW",
+		Args:          []string{"-c", "../../OpenGFW/configs/config.yaml", "../../OpenGFW/rules/ruleset.yaml"},
 		StdoutFile:    "OpenGFW." + expName + ".log",
 		StderrFile:    "OpenGFW." + expName + ".err",
 	}
