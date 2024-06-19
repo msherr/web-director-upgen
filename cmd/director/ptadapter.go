@@ -7,11 +7,11 @@ import (
 	"compress/gzip"
 	_ "embed"
 	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"path/filepath"
 	"regexp"
+	"text/template"
 )
 
 type FileMap map[string][]byte
