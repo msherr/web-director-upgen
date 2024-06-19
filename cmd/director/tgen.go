@@ -1,22 +1,19 @@
 package main
 
 import (
-	"log"
-	"os"
+	_ "embed"
 )
 
+//go:embed templates/server.tgen.graphml
+var serverTGenBytes []byte
+
+//go:embed templates/client.tgen.graphml
+var clientTGenBytes []byte
+
 func getServerTgen() []byte {
-	serverTgen, err := os.ReadFile("templates/server.tgen.graphml")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return serverTgen
+	return serverTGenBytes
 }
 
 func getClientTgen() []byte {
-	clientTgen, err := os.ReadFile("templates/client.tgen.graphml")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return clientTgen
+	return clientTGenBytes
 }

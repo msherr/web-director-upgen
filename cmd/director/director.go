@@ -161,14 +161,18 @@ func startClient(ctxCensoredVM context.Context, transportType TransportType, con
 	time.Sleep(10 * time.Second)
 }
 
-func startOpenGFW(ctxGFW context.Context, expName string) {
+func startOpenGFW(ctxGFW context.Context, expName, gfwExecPath string) {
 
 	startOpenGFWCommand := datamodel.JsonCommandStruct{
 		TimeoutInSecs: 0,
-		Cmd:           "../../OpenGFW/OpenGFW",
-		Args:          []string{"-c", "../../OpenGFW/configs/config.yaml", "../../OpenGFW/rules/ruleset.yaml"},
-		StdoutFile:    "OpenGFW." + expName + ".log",
-		StderrFile:    "OpenGFW." + expName + ".err",
+		Cmd:           gfwExecPath + "/OpenGFW",
+		Args: []string{
+			"-c",
+			gfwExecPath + "/configs/config.yaml",
+			gfwExecPath + "/rules/ruleset.yaml",
+		},
+		StdoutFile: "OpenGFW." + expName + ".log",
+		StderrFile: "OpenGFW." + expName + ".err",
 	}
 	log.Println("Starting OpenGFW")
 	if res := makeRequest(ctxGFW, "/runInBackground", startOpenGFWCommand); res != http.StatusOK {
@@ -193,6 +197,7 @@ func main() {
 		authToken           string
 		censoredUrlEndpoint string
 		gfwUrlEndpoint      string
+		gfwExecPath         string
 		bridgeUrlEndpoint   string
 		ptAdapterPath       string
 		tgenPath            string
@@ -209,6 +214,7 @@ func main() {
 	flag.StringVar(&expName, "exp", "", "experiment name")
 	flag.BoolVar(&insecure, "insecure", false, "Set to disable TLS verification (on all endpoints)")
 	flag.StringVar(&gfwUrlEndpoint, "gfw_url", "", "Specify the URL endpoint for OpenGFW")
+	flag.StringVar(&gfwExecPath, "gfw_exec", "../../OpenGFW/", "Specify the path to OpenGFW")
 	flag.StringVar(&censoredUrlEndpoint, "censoredvm_url", "", "Specify the URL endpoint for censored VM")
 	flag.StringVar(&bridgeUrlEndpoint, "bridge_url", "", "Specify the URL endpoint for the bridge")
 	flag.StringVar(&bridgeByIP, "bridge_ip", "", "Bridge's IP address")
@@ -248,7 +254,7 @@ func main() {
 	time.Sleep(2 * time.Second)
 
 	// start OpenGFW
-	startOpenGFW(ctxGFW, expName)
+	startOpenGFW(ctxGFW, expName, gfwExecPath)
 
 	for ttype := range []TransportType{obfsTransport, proteusTransport} {
 		for configNum := 1; configNum <= 10000; configNum++ {

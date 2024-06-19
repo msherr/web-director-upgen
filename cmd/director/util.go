@@ -36,7 +36,7 @@ func makeRequest(ctx context.Context, f string, data any) int {
 		"X-Session-Token": {token},
 		"Content-Type":    {"application/json"},
 	}
-	log.Printf("Making request to %v: %v\n", url+f, req)
+	log.Printf("Making request to %v: %v\n", url+f, data)
 	res, err := client.Do(req)
 	if err != nil {
 		log.Fatal(err)
@@ -88,6 +88,10 @@ func sendFile(ctx context.Context, fileName string, fileContents []byte) int {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
-	log.Printf("sent file %s to %s\n", fileName, url)
+	if resp.StatusCode == http.StatusOK {
+		log.Printf("sent file %s to %s\n", fileName, url)
+	} else {
+		log.Printf("could not send file %s to %s: status code %v", fileName, url, resp.Status)
+	}
 	return resp.StatusCode
 }
