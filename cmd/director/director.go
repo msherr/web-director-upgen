@@ -158,7 +158,7 @@ func startClient(ctxCensoredVM context.Context, transportType TransportType, con
 	if res := makeRequest(ctxCensoredVM, "/runInBackground", tgenCmd); res != http.StatusOK {
 		log.Fatal("could not start tgen on client")
 	}
-	time.Sleep(10 * time.Second)
+	time.Sleep(3500 * time.Millisecond)
 }
 
 func startOpenGFW(ctxGFW context.Context, expName, gfwExecPath string) {
@@ -272,6 +272,7 @@ func main() {
 						strings.ReplaceAll(expName, " ", ""),
 						ttype,
 						configNum),
+					"@retry=0",
 					"@" + bridgeByIP,
 				},
 			}
