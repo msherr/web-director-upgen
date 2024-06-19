@@ -69,12 +69,12 @@ func getObsCertificates(configNum int) FileMap {
 	return fileMap
 }
 
-func getObsCertificatePart(b []byte) string {
+func getObsCertificatePart(b []byte) []byte {
 	re := regexp.MustCompile(`cert=(.+) `)
 	scanner := bufio.NewScanner(bytes.NewReader(b))
 	for scanner.Scan() {
-		line := scanner.Text()
-		matches := re.FindStringSubmatch(line)
+		line := scanner.Bytes()
+		matches := re.FindSubmatch(line)
 		if len(matches) > 1 {
 			return matches[1]
 		}
@@ -86,7 +86,7 @@ func getObfsPTAdapterServerTemplate() []byte {
 	return ptAdapterObsServerTemplateBytes
 }
 
-func getObfsPTAdapterClientTemplate(certFile, bridgeHostname string) []byte {
+func getObfsPTAdapterClientTemplate(certString []byte, bridgeHostname string) []byte {
 	tmpl, err := template.New("obsClientTemplate").Parse(string(ptAdapterObsClientTemplateBytes))
 	if err != nil {
 		log.Fatal(err)
@@ -96,10 +96,10 @@ func getObfsPTAdapterClientTemplate(certFile, bridgeHostname string) []byte {
 	err = tmpl.Execute(&parsedTemplate,
 		struct {
 			Server string
-			Cert   string
+			Cert   []byte
 		}{
 			Server: bridgeHostname + ":8080",
-			Cert:   certFile,
+			Cert:   certString,
 		})
 	if err != nil {
 		log.Fatal(err)
