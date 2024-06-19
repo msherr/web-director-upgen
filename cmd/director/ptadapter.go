@@ -86,7 +86,7 @@ func getObfsPTAdapterServerTemplate() []byte {
 	return ptAdapterObsServerTemplateBytes
 }
 
-func getObfsPTAdapterClientTemplate(certString []byte, bridgeHostname string) []byte {
+func getObfsPTAdapterClientTemplate(certBytes []byte, bridgeHostname string) []byte {
 	tmpl, err := template.New("obsClientTemplate").Parse(string(ptAdapterObsClientTemplateBytes))
 	if err != nil {
 		log.Fatal(err)
@@ -96,10 +96,10 @@ func getObfsPTAdapterClientTemplate(certString []byte, bridgeHostname string) []
 	err = tmpl.Execute(&parsedTemplate,
 		struct {
 			Server string
-			Cert   []byte
+			Cert   string
 		}{
 			Server: bridgeHostname + ":8080",
-			Cert:   certString,
+			Cert:   string(certBytes),
 		})
 	if err != nil {
 		log.Fatal(err)
