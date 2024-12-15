@@ -210,6 +210,7 @@ func main() {
 		ptAdapterPath       string
 		tgenPath            string
 		bridgeByIP          string
+		iterations          int
 		insecure            bool
 	)
 	var ctxGFW, ctxCensoredVM, ctxBridge context.Context
@@ -228,6 +229,7 @@ func main() {
 	flag.StringVar(&bridgeByIP, "bridge_ip", "", "Bridge's IP address")
 	flag.StringVar(&ptAdapterPath, "ptadapter", "/usr/local/bin/ptadapter", "path to ptadapter on both bridge and censored VM")
 	flag.StringVar(&tgenPath, "tgen", "/usr/local/bin/tgen", "path to tgen on both bridge and censored VM")
+	flag.IntVar(&iterations, "iterations", 1000, "Number of iterations to run")
 	flag.Parse()
 
 	if expName == "" || gfwUrlEndpoint == "" || bridgeByIP == "" ||
@@ -265,7 +267,7 @@ func main() {
 	startOpenGFW(ctxGFW, expName, gfwExecPath)
 	time.Sleep(time.Second)
 
-	for configNum := 1; configNum <= 1000; configNum++ {
+	for configNum := 1; configNum <= iterations; configNum++ {
 		for _, ttype := range []TransportType{obfsTransport, proteusTransport} {
 
 			// make sure bridge and client aren't doing anything
