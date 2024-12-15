@@ -25,6 +25,12 @@ var ptAdapterObsClientTemplateBytes []byte
 //go:embed templates/ptadapter-obs-server.template
 var ptAdapterObsServerTemplateBytes []byte
 
+//go:embed templates/ptadapter-proteus-client.template
+var ptAdapterProteusClientTemplateBytes []byte
+
+//go:embed templates/ptadapter-proteus-server.template
+var ptAdapterProteusServerTemplateBytes []byte
+
 func getObsCertificates(configNum int) FileMap {
 
 	pattern := fmt.Sprintf("state.%d/*", configNum)
@@ -106,5 +112,47 @@ func getObfsPTAdapterClientTemplate(certBytes []byte, bridgeHostname string) []b
 	}
 
 	return parsedTemplate.Bytes()
+}
 
+func getProteusPTAdapterServerTemplate(optionString string) []byte {
+
+	tmpl, err := template.New("proteusServerTemplate").Parse(string(ptAdapterProteusServerTemplateBytes))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var parsedTemplate bytes.Buffer
+	err = tmpl.Execute(&parsedTemplate,
+		struct {
+			Options string
+		}{
+			Options: optionString,
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return parsedTemplate.Bytes()
+}
+
+func getProteusPTAdapterClientTemplate(optionString, bridgeHostname string) []byte {
+	tmpl, err := template.New("proteusClientTemplate").Parse(string(ptAdapterProteusClientTemplateBytes))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var parsedTemplate bytes.Buffer
+	err = tmpl.Execute(&parsedTemplate,
+		struct {
+			Server  string
+			Options string
+		}{
+			Server:  bridgeHostname + ":8080",
+			Options: optionString,
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return parsedTemplate.Bytes()
 }

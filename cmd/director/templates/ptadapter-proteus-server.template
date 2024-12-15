@@ -1,0 +1,23 @@
+[server]
+
+exec = ../upgen/proteus
+
+state = ./state
+# The state directory. Omit this line or specify an empty value to use a
+# temporary directory, which is cleaned when the PT exits.
+
+forward = 127.0.0.1:9999
+# Address and port to forward unobfuscated traffic to.
+
+tunnels = server_proteus
+
+[server_proteus]
+# This is the config section for a client transport tunnel.
+
+transport = proteus
+# Name of the transport for this tunnel. Should be a supported transport method
+# of the PT.
+
+listen = 0.0.0.0:8080
+
+options-psf = {{.Options}}

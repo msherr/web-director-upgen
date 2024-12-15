@@ -1,0 +1,33 @@
+[client]
+
+exec = ../upgen/proteus
+
+state = ./state
+# The state directory. Omit this line or specify an empty value to use a
+# temporary directory, which is cleaned when the PT exits.
+
+tunnels = client_proteus
+# Section names describing client transport tunnels, separated by whitespace.
+# Each specified section must exist.
+
+
+[client_proteus]
+# This is the config section for a client transport tunnel.
+
+transport = proteus
+# Name of the transport for this tunnel. Should be a supported transport method
+# of the PT.
+
+listen = 127.0.0.1:9999
+# Address and port to listen for unobfuscated client traffic.
+
+# Upstream PT address and port to send obfuscated traffic to.
+upstream = {{.Server}}
+
+# Upstream PT address and port to send obfuscated traffic to.
+
+# If the client transport tunnel requires per-tunnel options, specify them
+# on separate lines, one line for each option.
+# The configuration key should be named "options-<option name>".
+
+options-client_psf = {{.Options}}

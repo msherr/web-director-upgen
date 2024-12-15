@@ -64,7 +64,7 @@ func startBridge(ctxBridge context.Context, transportType TransportType, configN
 	case obfsTransport:
 		ptAdapterConfigBytes = getObfsPTAdapterServerTemplate()
 	case proteusTransport:
-		log.Fatal("Proteus transport not implemented yet")
+		ptAdapterConfigBytes = getProteusPTAdapterServerTemplate("FIXME")
 	}
 
 	if res := sendFile(ctxBridge, "ptadapter.server.conf", ptAdapterConfigBytes); res != http.StatusOK {
@@ -115,19 +115,18 @@ func startClient(ctxCensoredVM context.Context, transportType TransportType, con
 		log.Fatal("could not send client.tgen.graphml to bridge")
 	}
 
-	// extract certificate
-	m := getObsCertificates(configNum)
-	certString := getObsCertificatePart(m["obfs4_bridgeline.txt"])
-
 	var ptAdapterConfigBytes []byte
 
 	switch transportType {
 	case undefinedTransport:
 		log.Fatal("transport type not defined")
 	case obfsTransport:
+		// extract certificate
+		m := getObsCertificates(configNum)
+		certString := getObsCertificatePart(m["obfs4_bridgeline.txt"])
 		ptAdapterConfigBytes = getObfsPTAdapterClientTemplate(certString, bridgeHostname)
 	case proteusTransport:
-		log.Fatal("Proteus transport not implemented yet")
+		ptAdapterConfigBytes = getProteusPTAdapterClientTemplate("FIXME", bridgeHostname)
 	}
 
 	if res := sendFile(ctxCensoredVM, "ptadapter.client.conf", ptAdapterConfigBytes); res != http.StatusOK {
@@ -255,9 +254,10 @@ func main() {
 
 	// start OpenGFW
 	startOpenGFW(ctxGFW, expName, gfwExecPath)
+	time.Sleep(time.Second)
 
 	for ttype := range []TransportType{obfsTransport, proteusTransport} {
-		for configNum := 1; configNum <= 10000; configNum++ {
+		for configNum := 1; configNum <= 1000; configNum++ {
 
 			// make sure bridge and client aren't doing anything
 			stopAllJobs([]*context.Context{&ctxCensoredVM, &ctxBridge})
@@ -279,10 +279,10 @@ func main() {
 			makeRequest(ctxCensoredVM, "/runToCompletion", digCmd)
 
 			// start ptadapter and tgen on the bridge
-			startBridge(ctxBridge, obfsTransport, configNum, expName, tgenPath, ptAdapterPath)
+			startBridge(ctxBridge, TransportType(ttype), configNum, expName, tgenPath, ptAdapterPath)
 
 			// start tgen and ptadapter on the censored VM
-			startClient(ctxCensoredVM, obfsTransport, configNum, expName, tgenPath, ptAdapterPath, bridgeByIP)
+			startClient(ctxCensoredVM, TransportType(ttype), configNum, expName, tgenPath, ptAdapterPath, bridgeByIP)
 
 		}
 	}
