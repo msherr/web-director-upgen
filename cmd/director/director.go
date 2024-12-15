@@ -37,7 +37,16 @@ var allJobs = struct {
 }
 
 func (t TransportType) String() string {
-	return [...]string{"undefined", "obfs", "proteus"}[t]
+	switch t {
+	case undefinedTransport:
+		return "undefined"
+	case obfsTransport:
+		return "obfs"
+	case proteusTransport:
+		return "proteus"
+	default:
+		return "unknown"
+	}
 }
 
 // starts the bridge
@@ -256,8 +265,8 @@ func main() {
 	startOpenGFW(ctxGFW, expName, gfwExecPath)
 	time.Sleep(time.Second)
 
-	for ttype := range []TransportType{obfsTransport, proteusTransport} {
-		for configNum := 1; configNum <= 1000; configNum++ {
+	for configNum := 1; configNum <= 1000; configNum++ {
+		for _, ttype := range []TransportType{obfsTransport, proteusTransport} {
 
 			// make sure bridge and client aren't doing anything
 			stopAllJobs([]*context.Context{&ctxCensoredVM, &ctxBridge})
@@ -279,10 +288,10 @@ func main() {
 			makeRequest(ctxCensoredVM, "/runToCompletion", digCmd)
 
 			// start ptadapter and tgen on the bridge
-			startBridge(ctxBridge, TransportType(ttype), configNum, expName, tgenPath, ptAdapterPath)
+			startBridge(ctxBridge, ttype, configNum, expName, tgenPath, ptAdapterPath)
 
 			// start tgen and ptadapter on the censored VM
-			startClient(ctxCensoredVM, TransportType(ttype), configNum, expName, tgenPath, ptAdapterPath, bridgeByIP)
+			startClient(ctxCensoredVM, ttype, configNum, expName, tgenPath, ptAdapterPath, bridgeByIP)
 
 		}
 	}
