@@ -1,6 +1,6 @@
 [client]
 
-exec = ../upgen/proteus
+exec = ../../upgen/proteus
 
 state = ./state
 # The state directory. Omit this line or specify an empty value to use a

@@ -7,11 +7,12 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type AuthTokenKeyType string
@@ -73,7 +74,11 @@ func startBridge(ctxBridge context.Context, transportType TransportType, configN
 	case obfsTransport:
 		ptAdapterConfigBytes = getObfsPTAdapterServerTemplate()
 	case proteusTransport:
-		ptAdapterConfigBytes = getProteusPTAdapterServerTemplate("FIXME")
+		psfPath := fmt.Sprintf("../../upgen/psfs/%d.psf", configNum)
+		if _, err := os.Stat(psfPath); err != nil {
+			log.Fatalf("PSF file access error (%v): %s", err, psfPath)
+		}
+		ptAdapterConfigBytes = getProteusPTAdapterServerTemplate(psfPath)
 	}
 
 	if res := sendFile(ctxBridge, "ptadapter.server.conf", ptAdapterConfigBytes); res != http.StatusOK {
@@ -135,7 +140,11 @@ func startClient(ctxCensoredVM context.Context, transportType TransportType, con
 		certString := getObsCertificatePart(m["obfs4_bridgeline.txt"])
 		ptAdapterConfigBytes = getObfsPTAdapterClientTemplate(certString, bridgeHostname)
 	case proteusTransport:
-		ptAdapterConfigBytes = getProteusPTAdapterClientTemplate("FIXME", bridgeHostname)
+		psfPath := fmt.Sprintf("../../upgen/psfs/%d.psf", configNum)
+		if _, err := os.Stat(psfPath); err != nil {
+			log.Fatalf("PSF file access error (%v): %s", err, psfPath)
+		}
+		ptAdapterConfigBytes = getProteusPTAdapterClientTemplate(psfPath, bridgeHostname)
 	}
 
 	if res := sendFile(ctxCensoredVM, "ptadapter.client.conf", ptAdapterConfigBytes); res != http.StatusOK {
@@ -269,6 +278,8 @@ func main() {
 
 	for configNum := 1; configNum <= iterations; configNum++ {
 		for _, ttype := range []TransportType{obfsTransport, proteusTransport} {
+
+			log.Infof("Starting iteration %d with transport type %s", configNum, ttype)
 
 			// make sure bridge and client aren't doing anything
 			stopAllJobs([]*context.Context{&ctxCensoredVM, &ctxBridge})
