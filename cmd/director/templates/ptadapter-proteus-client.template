@@ -30,4 +30,4 @@ upstream = {{.Server}}
 # on separate lines, one line for each option.
 # The configuration key should be named "options-<option name>".
 
-options-client_psf = {{.Options}}
+options-psf = {{.Options}}

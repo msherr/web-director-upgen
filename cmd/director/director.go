@@ -75,9 +75,6 @@ func startBridge(ctxBridge context.Context, transportType TransportType, configN
 		ptAdapterConfigBytes = getObfsPTAdapterServerTemplate()
 	case proteusTransport:
 		psfPath := fmt.Sprintf("../../upgen/psfs/%d.psf", configNum)
-		if _, err := os.Stat(psfPath); err != nil {
-			log.Fatalf("PSF file access error (%v): %s", err, psfPath)
-		}
 		ptAdapterConfigBytes = getProteusPTAdapterServerTemplate(psfPath)
 	}
 
@@ -90,8 +87,8 @@ func startBridge(ctxBridge context.Context, transportType TransportType, configN
 		TimeoutInSecs: 0,
 		Cmd:           tgenPath,
 		Args:          []string{"server.tgen.graphml"},
-		StdoutFile:    fmt.Sprintf("tgen.bridge.%s.%d.log", expName, configNum),
-		StderrFile:    fmt.Sprintf("tgen.bridge.%s.%d.err", expName, configNum),
+		StdoutFile:    fmt.Sprintf("tgen.%v.bridge.%s.%d.log", transportType, expName, configNum),
+		StderrFile:    fmt.Sprintf("tgen.%v.bridge.%s.%d.err", transportType, expName, configNum),
 	}
 	if res := makeRequest(ctxBridge, "/runInBackground", tgenCmd); res != http.StatusOK {
 		log.Fatal("could not start tgen on bridge")
@@ -102,8 +99,8 @@ func startBridge(ctxBridge context.Context, transportType TransportType, configN
 		TimeoutInSecs: 0,
 		Cmd:           ptAdapterPath,
 		Args:          []string{"-S", "ptadapter.server.conf"},
-		StdoutFile:    fmt.Sprintf("ptadapter.bridge.%s.%d.log", expName, configNum),
-		StderrFile:    fmt.Sprintf("ptadapter.bridge.%s.%d.err", expName, configNum),
+		StdoutFile:    fmt.Sprintf("ptadapter.%v.bridge.%s.%d.log", transportType, expName, configNum),
+		StderrFile:    fmt.Sprintf("ptadapter.%v.bridge.%s.%d.err", transportType, expName, configNum),
 	}
 	if res := makeRequest(ctxBridge, "/runInBackground", ptAdapterCommand); res != http.StatusOK {
 		log.Fatal("could not start ptadapter on bridge")
@@ -141,9 +138,6 @@ func startClient(ctxCensoredVM context.Context, transportType TransportType, con
 		ptAdapterConfigBytes = getObfsPTAdapterClientTemplate(certString, bridgeHostname)
 	case proteusTransport:
 		psfPath := fmt.Sprintf("../../upgen/psfs/%d.psf", configNum)
-		if _, err := os.Stat(psfPath); err != nil {
-			log.Fatalf("PSF file access error (%v): %s", err, psfPath)
-		}
 		ptAdapterConfigBytes = getProteusPTAdapterClientTemplate(psfPath, bridgeHostname)
 	}
 
@@ -156,8 +150,8 @@ func startClient(ctxCensoredVM context.Context, transportType TransportType, con
 		TimeoutInSecs: 0,
 		Cmd:           ptAdapterPath,
 		Args:          []string{"-C", "ptadapter.client.conf"},
-		StdoutFile:    fmt.Sprintf("ptadapter.client.%s.%d.log", expName, configNum),
-		StderrFile:    fmt.Sprintf("ptadapter.client.%s.%d.err", expName, configNum),
+		StdoutFile:    fmt.Sprintf("ptadapter.%v.client.%s.%d.log", transportType, expName, configNum),
+		StderrFile:    fmt.Sprintf("ptadapter.%v.client.%s.%d.err", transportType, expName, configNum),
 	}
 	if res := makeRequest(ctxCensoredVM, "/runInBackground", ptAdapterCommand); res != http.StatusOK {
 		log.Fatal("could not start ptadapter on client")
@@ -168,8 +162,8 @@ func startClient(ctxCensoredVM context.Context, transportType TransportType, con
 		TimeoutInSecs: 0,
 		Cmd:           tgenPath,
 		Args:          []string{"client.tgen.graphml"},
-		StdoutFile:    fmt.Sprintf("tgen.client.%s.%d.log", expName, configNum),
-		StderrFile:    fmt.Sprintf("tgen.client.%s.%d.err", expName, configNum),
+		StdoutFile:    fmt.Sprintf("tgen.%v.client.%s.%d.log", transportType, expName, configNum),
+		StderrFile:    fmt.Sprintf("tgen.%v.client.%s.%d.err", transportType, expName, configNum),
 	}
 	log.Println("running tgen on censored VM...")
 	if res := makeRequest(ctxCensoredVM, "/runInBackground", tgenCmd); res != http.StatusOK {
@@ -221,6 +215,7 @@ func main() {
 		bridgeByIP          string
 		iterations          int
 		insecure            bool
+		firewallOff         bool
 	)
 	var ctxGFW, ctxCensoredVM, ctxBridge context.Context
 
@@ -231,6 +226,7 @@ func main() {
 
 	flag.StringVar(&expName, "exp", "", "experiment name")
 	flag.BoolVar(&insecure, "insecure", false, "Set to disable TLS verification (on all endpoints)")
+	flag.BoolVar(&firewallOff, "firewall_off", false, "Set to disable OpenGFW")
 	flag.StringVar(&gfwUrlEndpoint, "gfw_url", "", "Specify the URL endpoint for OpenGFW")
 	flag.StringVar(&gfwExecPath, "gfw_exec", "../../OpenGFW/", "Specify the path to OpenGFW")
 	flag.StringVar(&censoredUrlEndpoint, "censoredvm_url", "", "Specify the URL endpoint for censored VM")
@@ -273,7 +269,9 @@ func main() {
 	time.Sleep(2 * time.Second)
 
 	// start OpenGFW
-	startOpenGFW(ctxGFW, expName, gfwExecPath)
+	if !firewallOff {
+		startOpenGFW(ctxGFW, expName, gfwExecPath)
+	}
 	time.Sleep(time.Second)
 
 	for configNum := 1; configNum <= iterations; configNum++ {
