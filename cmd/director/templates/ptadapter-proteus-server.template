@@ -20,4 +20,4 @@ transport = proteus
 
 listen = 0.0.0.0:8080
 
-options-psf = {{.Options}}
+options-server_psf = {{.Options}}
