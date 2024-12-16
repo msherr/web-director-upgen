@@ -18,6 +18,7 @@ transport = proteus
 # Name of the transport for this tunnel. Should be a supported transport method
 # of the PT.
 
-listen = 0.0.0.0:8080
+#listen = 0.0.0.0:8080
+listen = 0.0.0.0:{{.ListenPort}}
 
 options-psf = {{.Options}}

@@ -72,10 +72,10 @@ func startBridge(ctxBridge context.Context, transportType TransportType, configN
 	case undefinedTransport:
 		log.Fatal("transport type not defined")
 	case obfsTransport:
-		ptAdapterConfigBytes = getObfsPTAdapterServerTemplate()
+		ptAdapterConfigBytes = getObfsPTAdapterServerTemplate(configNum)
 	case proteusTransport:
 		psfPath := fmt.Sprintf("../../upgen/psfs/%d.psf", configNum)
-		ptAdapterConfigBytes = getProteusPTAdapterServerTemplate(psfPath)
+		ptAdapterConfigBytes = getProteusPTAdapterServerTemplate(psfPath, configNum)
 	}
 
 	if res := sendFile(ctxBridge, "ptadapter.server.conf", ptAdapterConfigBytes); res != http.StatusOK {
@@ -135,10 +135,10 @@ func startClient(ctxCensoredVM context.Context, transportType TransportType, con
 		// extract certificate
 		m := getObsCertificates(configNum)
 		certString := getObsCertificatePart(m["obfs4_bridgeline.txt"])
-		ptAdapterConfigBytes = getObfsPTAdapterClientTemplate(certString, bridgeHostname)
+		ptAdapterConfigBytes = getObfsPTAdapterClientTemplate(certString, bridgeHostname, configNum)
 	case proteusTransport:
 		psfPath := fmt.Sprintf("../../upgen/psfs/%d.psf", configNum)
-		ptAdapterConfigBytes = getProteusPTAdapterClientTemplate(psfPath, bridgeHostname)
+		ptAdapterConfigBytes = getProteusPTAdapterClientTemplate(psfPath, bridgeHostname, configNum)
 	}
 
 	if res := sendFile(ctxCensoredVM, "ptadapter.client.conf", ptAdapterConfigBytes); res != http.StatusOK {

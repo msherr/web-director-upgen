@@ -31,6 +31,8 @@ var ptAdapterProteusClientTemplateBytes []byte
 //go:embed templates/ptadapter-proteus-server.template
 var ptAdapterProteusServerTemplateBytes []byte
 
+const startingPortNum = 8080
+
 func getObsCertificates(configNum int) FileMap {
 
 	pattern := fmt.Sprintf("state.%d/*", configNum)
@@ -88,11 +90,28 @@ func getObsCertificatePart(b []byte) []byte {
 	panic("could not find cert in file")
 }
 
-func getObfsPTAdapterServerTemplate() []byte {
-	return ptAdapterObsServerTemplateBytes
+func getObfsPTAdapterServerTemplate(iterationNum int) []byte {
+	tmpl, err := template.New("obsServerTemplate").Parse(string(ptAdapterObsServerTemplateBytes))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var parsedTemplate bytes.Buffer
+	err = tmpl.Execute(&parsedTemplate,
+		struct {
+			ListenPort int
+		}{
+			ListenPort: iterationNum + startingPortNum,
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return parsedTemplate.Bytes()
+
 }
 
-func getObfsPTAdapterClientTemplate(certBytes []byte, bridgeHostname string) []byte {
+func getObfsPTAdapterClientTemplate(certBytes []byte, bridgeHostname string, iterationNum int) []byte {
 	tmpl, err := template.New("obsClientTemplate").Parse(string(ptAdapterObsClientTemplateBytes))
 	if err != nil {
 		log.Fatal(err)
@@ -104,7 +123,7 @@ func getObfsPTAdapterClientTemplate(certBytes []byte, bridgeHostname string) []b
 			Server string
 			Cert   string
 		}{
-			Server: bridgeHostname + ":8080",
+			Server: fmt.Sprintf("%s:%d", bridgeHostname, iterationNum+startingPortNum),
 			Cert:   string(certBytes),
 		})
 	if err != nil {
@@ -114,7 +133,7 @@ func getObfsPTAdapterClientTemplate(certBytes []byte, bridgeHostname string) []b
 	return parsedTemplate.Bytes()
 }
 
-func getProteusPTAdapterServerTemplate(optionString string) []byte {
+func getProteusPTAdapterServerTemplate(optionString string, iterationNum int) []byte {
 
 	tmpl, err := template.New("proteusServerTemplate").Parse(string(ptAdapterProteusServerTemplateBytes))
 	if err != nil {
@@ -124,9 +143,11 @@ func getProteusPTAdapterServerTemplate(optionString string) []byte {
 	var parsedTemplate bytes.Buffer
 	err = tmpl.Execute(&parsedTemplate,
 		struct {
-			Options string
+			Options    string
+			ListenPort int
 		}{
-			Options: optionString,
+			Options:    optionString,
+			ListenPort: iterationNum + startingPortNum,
 		})
 	if err != nil {
 		log.Fatal(err)
@@ -135,7 +156,7 @@ func getProteusPTAdapterServerTemplate(optionString string) []byte {
 	return parsedTemplate.Bytes()
 }
 
-func getProteusPTAdapterClientTemplate(optionString, bridgeHostname string) []byte {
+func getProteusPTAdapterClientTemplate(optionString, bridgeHostname string, iterationNum int) []byte {
 	tmpl, err := template.New("proteusClientTemplate").Parse(string(ptAdapterProteusClientTemplateBytes))
 	if err != nil {
 		log.Fatal(err)
@@ -147,7 +168,7 @@ func getProteusPTAdapterClientTemplate(optionString, bridgeHostname string) []by
 			Server  string
 			Options string
 		}{
-			Server:  bridgeHostname + ":8080",
+			Server:  fmt.Sprintf("%s:%d", bridgeHostname, iterationNum+startingPortNum),
 			Options: optionString,
 		})
 	if err != nil {
