@@ -1,1 +1,2 @@
 censored.tar.gz filter=lfs diff=lfs merge=lfs -text
+opengfw.tar.gz filter=lfs diff=lfs merge=lfs -text
